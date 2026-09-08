@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { StorageService } from '../services/storage.js'
 
 const TECHNIQUES = [
   {
@@ -80,6 +81,7 @@ export default function BreathingView() {
               const nextIdx = (currPhaseIdx + 1) % activeTech.pattern.length
               if (nextIdx === 0) {
                 setCompletedCycles((c) => c + 1)
+                StorageService.recordRecovery('breathing', `${activeTech.name} Breathing Session`)
               }
               return nextIdx
             })

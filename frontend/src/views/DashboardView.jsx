@@ -16,6 +16,7 @@ export default function DashboardView({ onOpenCalendar, onOpenBreathing }) {
     socialHours,
     rechargeHours,
     eventsCount,
+    recoveryStreak,
   } = capacityData
 
   // Status level styling
@@ -84,6 +85,7 @@ export default function DashboardView({ onOpenCalendar, onOpenBreathing }) {
       isFlexible: false,
     }
     StorageService.saveCalendarEvent(recoveryEvent)
+    StorageService.recordRecovery('recharge', '🌿 Mindful Recharge Break')
     setCapacityData(StorageService.calculateCapacity())
     setRecoveryAdded(true)
     setTimeout(() => setRecoveryAdded(false), 3000)
@@ -179,8 +181,22 @@ export default function DashboardView({ onOpenCalendar, onOpenBreathing }) {
             </div>
           </div>
 
-          <div className="flex justify-between pt-2 text-[11px] text-stone-400">
-            <span>🔥 4-Day Recovery Streak Active</span>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pt-3 border-t border-stone-100 text-xs">
+            <div className="flex items-center gap-2">
+              <span className="text-base">🔥</span>
+              <span className="font-bold text-stone-800">
+                {recoveryStreak?.currentStreak || 1}-Day Recovery Streak
+              </span>
+              {recoveryStreak?.hasRecoveredToday ? (
+                <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-extrabold text-emerald-800">
+                  Completed Today ✓
+                </span>
+              ) : (
+                <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-extrabold text-amber-800">
+                  Pending Today ⏳
+                </span>
+              )}
+            </div>
             <button
               type="button"
               onClick={onOpenCalendar}

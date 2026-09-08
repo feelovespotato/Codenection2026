@@ -5,6 +5,7 @@ const KEYS = {
   MOOD: 'moodify_mood_logs',
   CALENDAR: 'moodify_calendar_events',
   STRESS: 'moodify_stress_records',
+  RECOVERY: 'moodify_recovery_logs',
   SETTINGS: 'moodify_settings',
 }
 
@@ -221,6 +222,84 @@ export const StorageService = {
       socialHours: Number(socialHours.toFixed(1)),
       rechargeHours: Number(rechargeHours.toFixed(1)),
       eventsCount: events.length,
+      recoveryStreak: this.calculateRecoveryStreak(),
+    }
+  },
+
+  // --- RECOVERY LOGS & STREAK TRACKER ---
+  getRecoveryLogs() {
+    try {
+      const data = localStorage.getItem(KEYS.RECOVERY)
+      if (data) return JSON.parse(data)
+      // Provide default sample streak of past 3 days so user sees an active streak right away
+      const now = Date.now()
+      const d1 = new Date(now - 86400000).toISOString().split('T')[0]
+      const d2 = new Date(now - 86400000 * 2).toISOString().split('T')[0]
+      const d3 = new Date(now - 86400000 * 3).toISOString().split('T')[0]
+      const defaults = [
+        { date: d1, type: 'recharge', title: 'Evening Walk & Meditation' },
+        { date: d2, type: 'breathing', title: '4-7-8 Breathing Session' },
+        { date: d3, type: 'recharge', title: 'Power Nap & Rest' },
+      ]
+      localStorage.setItem(KEYS.RECOVERY, JSON.stringify(defaults))
+      return defaults
+    } catch {
+      return []
+    }
+  },
+
+  recordRecovery(type = 'activity', title = 'Recharge Activity') {
+    const today = new Date().toISOString().split('T')[0]
+    const logs = this.getRecoveryLogs()
+    const exists = logs.some((l) => l.date === today && l.title === title)
+    if (!exists) {
+      logs.unshift({ date: today, type, title, timestamp: new Date().toISOString() })
+      localStorage.setItem(KEYS.RECOVERY, JSON.stringify(logs))
+    }
+    return this.calculateRecoveryStreak()
+  },
+
+  calculateRecoveryStreak() {
+    const today = new Date().toISOString().split('T')[0]
+    const logs = this.getRecoveryLogs()
+
+    // Also include any calendar recharge events as recovery days
+    const events = this.getCalendarEvents()
+    const rechargeEventDates = new Set(
+      events.filter((e) => e.category === 'recharge').map((e) => e.date),
+    )
+
+    // Set of all unique dates where user completed a recovery action
+    const recoveryDates = new Set([
+      ...logs.map((l) => l.date),
+      ...rechargeEventDates,
+    ])
+
+    const hasRecoveredToday = recoveryDates.has(today)
+
+    // Calculate streak counting backwards
+    let streak = 0
+    const checkDate = new Date()
+
+    if (!hasRecoveredToday) {
+      checkDate.setDate(checkDate.getDate() - 1)
+    }
+
+    while (true) {
+      const dateStr = checkDate.toISOString().split('T')[0]
+      if (recoveryDates.has(dateStr)) {
+        streak++
+        checkDate.setDate(checkDate.getDate() - 1)
+      } else {
+        break
+      }
+    }
+
+    return {
+      currentStreak: streak,
+      hasRecoveredToday,
+      totalRecoverySessions: recoveryDates.size,
+      recentDates: Array.from(recoveryDates).sort().reverse().slice(0, 7),
     }
   },
 }
