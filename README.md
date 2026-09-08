@@ -1,5 +1,7 @@
 # Codenection2026
 
+React + Vite + JS + PixiJS + Tailwind /css
+
 > **Your personal workload and recovery assistant — understand your capacity, rebalance your schedule, and prevent burnout before it happens.**
 
 Moodify helps students manage their workload by combining **objective calendar data** with **subjective stress signals**. Instead of being another to-do list, Moodify understands how much is on your plate, how it feels, and recommends actions to bring your workload back into balance.
