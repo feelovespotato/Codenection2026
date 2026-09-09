@@ -84,7 +84,32 @@ const DEFAULT_MOOD_LOGS = [
   },
 ]
 
+const DEFAULT_SETTINGS = {
+  musicEnabled: true,
+  musicVolume: 0.2,
+}
+
 export const StorageService = {
+  // --- APP SETTINGS ---
+  getSettings() {
+    try {
+      const stored = JSON.parse(localStorage.getItem(KEYS.SETTINGS) || '{}')
+      return {
+        ...DEFAULT_SETTINGS,
+        ...stored,
+        musicEnabled: stored.musicEnabled ?? DEFAULT_SETTINGS.musicEnabled,
+        musicVolume: Math.min(1, Math.max(0, Number(stored.musicVolume ?? DEFAULT_SETTINGS.musicVolume))),
+      }
+    } catch {
+      return DEFAULT_SETTINGS
+    }
+  },
+  saveSettings(settings) {
+    const next = { ...this.getSettings(), ...settings }
+    localStorage.setItem(KEYS.SETTINGS, JSON.stringify(next))
+    return next
+  },
+
   // --- DIARY ---
   getDiaryEntries() {
     try {

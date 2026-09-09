@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import MainGamePage from './mainpage/MainGamePage.jsx'
 import Modal from './components/Modal.jsx'
 import DiaryView from './views/DiaryView.jsx'
@@ -10,10 +10,66 @@ import DashboardView from './views/DashboardView.jsx'
 import SoundView from './views/SoundView.jsx'
 import InstructionsView from './views/InstructionsView.jsx'
 import { StorageService } from './services/storage.js'
+import RoomMap from './social/RoomMap.jsx'
+import SocialRoom from './social/SocialRoom.jsx'
 
 export default function App() {
   const [activeModal, setActiveModal] = useState(null)
+  const [activeScene, setActiveScene] = useState('main')
   const [capacity, setCapacity] = useState(() => StorageService.calculateCapacity())
+  const [musicSettings, setMusicSettings] = useState(() => StorageService.getSettings())
+  const backgroundMusicRef = useRef(null)
+  const initialMusicSettingsRef = useRef(musicSettings)
+  const musicEnabledRef = useRef(musicSettings.musicEnabled)
+
+  useEffect(() => {
+    const initialSettings = initialMusicSettingsRef.current
+    const audio = new Audio('/audio/calm_piano.mp3')
+    audio.loop = true
+    audio.preload = 'auto'
+    audio.volume = initialSettings.musicVolume
+    audio.muted = !initialSettings.musicEnabled
+    backgroundMusicRef.current = audio
+
+    const beginAfterInteraction = () => {
+      audio.play().then(() => {
+        if (!musicEnabledRef.current) audio.pause()
+        window.removeEventListener('pointerdown', beginAfterInteraction)
+        window.removeEventListener('keydown', beginAfterInteraction)
+      }).catch(() => {})
+    }
+
+    if (initialSettings.musicEnabled) audio.play().catch(() => {})
+    window.addEventListener('pointerdown', beginAfterInteraction)
+    window.addEventListener('keydown', beginAfterInteraction)
+
+    return () => {
+      window.removeEventListener('pointerdown', beginAfterInteraction)
+      window.removeEventListener('keydown', beginAfterInteraction)
+      audio.pause()
+      audio.src = ''
+      backgroundMusicRef.current = null
+    }
+  }, [])
+
+  useEffect(() => {
+    musicEnabledRef.current = musicSettings.musicEnabled
+    StorageService.saveSettings(musicSettings)
+    const audio = backgroundMusicRef.current
+    if (!audio) return
+    audio.volume = musicSettings.musicVolume
+    audio.muted = !musicSettings.musicEnabled
+    if (musicSettings.musicEnabled) audio.play().catch(() => {})
+    else audio.pause()
+  }, [musicSettings])
+
+  const setMusicVolume = useCallback((volume) => {
+    setMusicSettings((current) => ({ ...current, musicVolume: Math.min(1, Math.max(0, volume)) }))
+  }, [])
+
+  const setMusicEnabled = useCallback((enabled) => {
+    setMusicSettings((current) => ({ ...current, musicEnabled: enabled }))
+  }, [])
 
   const refreshCapacity = useCallback(() => {
     setCapacity(StorageService.calculateCapacity())
@@ -26,12 +82,15 @@ export default function App() {
 
   // Handle room item clicks
   const handleActivity = useCallback((iconId) => {
+    if (iconId === 'phone') {
+      setActiveScene('map')
+      return
+    }
     const map = {
       diary: 'diary',
       mood: 'mood',
       calendar: 'calendar',
       hourglass: 'breathing',
-      phone: 'stress',
       graph: 'dashboard',
       instructions: 'instructions',
     }
@@ -55,7 +114,7 @@ export default function App() {
   }
 
   return (
-    <div className="relative h-screen w-screen overflow-hidden bg-[#0d0b12] text-[#fff8ef]">
+    <div className="relative h-screen w-screen overflow-hidden bg-[#0d0b12] text-[#fff8ef]" data-scene={activeScene}>
       {/* Floating Top Wellness Navigation Bar */}
       <header className="pointer-events-none absolute inset-x-0 top-0 z-40 flex items-center justify-between p-3 sm:px-6">
         {/* Brand & Room Title */}
@@ -156,11 +215,28 @@ export default function App() {
       </header>
 
       {/* Main PixiJS Game Room */}
-      <MainGamePage
-        onActivity={handleActivity}
-        onFeature={handleFeature}
-        onHotspot={(spotId) => console.log('Hotspot tapped:', spotId)}
-      />
+      {activeScene === 'main' && (
+        <MainGamePage
+          onActivity={handleActivity}
+          onFeature={handleFeature}
+          onHotspot={(spotId) => console.log('Hotspot tapped:', spotId)}
+          musicEnabled={musicSettings.musicEnabled}
+          musicVolume={musicSettings.musicVolume}
+          onMusicEnabledChange={setMusicEnabled}
+          onMusicVolumeChange={setMusicVolume}
+        />
+      )}
+
+      {activeScene === 'map' && (
+        <RoomMap
+          onBack={() => setActiveScene('main')}
+          onEnterRoom={() => setActiveScene('social')}
+        />
+      )}
+
+      {activeScene === 'social' && (
+        <SocialRoom onBackToMap={() => setActiveScene('map')} />
+      )}
 
       {/* Wellness Modals */}
       {activeModal === 'diary' && (

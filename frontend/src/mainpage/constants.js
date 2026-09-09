@@ -20,7 +20,7 @@ export const ICONS = [
   { id: 'mood', src: '/moodify/mood-tracker.png', x: 350, y: 70, label: 'Mood tracker', layer: 'behind' },
   { id: 'calendar', src: '/moodify/calendar.png', x: 370, y: 140, label: 'Calendar', layer: 'behind' },
   { id: 'graph', src: '/moodify/bar-graph.png', x: 500, y: 154, label: 'Progress graph', layer: 'front' },
-  { id: 'phone', src: '/moodify/phone.png', x: 1185, y: 190, label: 'Stress check-in', layer: 'front' },
+  { id: 'phone', src: '/moodify/phone.png', x: 1185, y: 190, label: 'Open room map', layer: 'front' },
   { id: 'instructions', src: '/moodify/question-mark.png', x: 1189, y: 100, label: 'How to play', layer: 'front' },
 ]
 

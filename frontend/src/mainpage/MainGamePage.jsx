@@ -1,7 +1,16 @@
 import { useEffect, useRef, useState } from 'react'
 import { createMoodifyGame } from './MoodifyGame.js'
 
-export default function MainGamePage({ onActivity, onHotspot, onFeature, onSettings }) {
+export default function MainGamePage({
+  onActivity,
+  onHotspot,
+  onFeature,
+  onSettings,
+  musicEnabled,
+  musicVolume,
+  onMusicEnabledChange,
+  onMusicVolumeChange,
+}) {
   const hostRef = useRef(null)
   const gameRef = useRef(null)
   const [loading, setLoading] = useState(true)
@@ -66,6 +75,44 @@ export default function MainGamePage({ onActivity, onHotspot, onFeature, onSetti
               <button type="button" className="px-2 text-xl font-black" onClick={() => setSettingsOpen(false)} aria-label="Close settings">×</button>
             </div>
             <p className="text-sm leading-5">Use the left and right arrow keys on your keyboard to walk around your Moodify room.</p>
+
+            <div className="mt-4 border-t-2 border-[#d7b49c] pt-3">
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <label htmlFor="cozy-music-volume" className="text-xs font-black uppercase tracking-wider">
+                  Cozy music
+                </label>
+                <button
+                  type="button"
+                  onClick={() => onMusicEnabledChange?.(!musicEnabled)}
+                  className={`border-2 border-[#3b2930] px-2 py-1 text-xs font-black shadow-[2px_2px_0_#3b2930] ${
+                    musicEnabled ? 'bg-[#b8d99b] text-[#263025]' : 'bg-[#dbc9bc] text-[#554741]'
+                  }`}
+                  aria-pressed={musicEnabled}
+                >
+                  {musicEnabled ? '🔊 On' : '🔇 Off'}
+                </button>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span aria-hidden="true" className="text-xs">♪</span>
+                <input
+                  id="cozy-music-volume"
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.05"
+                  value={musicVolume}
+                  onChange={(event) => onMusicVolumeChange?.(Number(event.target.value))}
+                  className="h-2 min-w-0 flex-1 cursor-pointer accent-[#a75f48]"
+                  aria-label="Cozy music volume"
+                  disabled={!musicEnabled}
+                />
+                <output htmlFor="cozy-music-volume" className="w-9 text-right text-xs font-black">
+                  {Math.round(musicVolume * 100)}%
+                </output>
+              </div>
+              <p className="mt-2 text-[11px] leading-4 text-[#6f5b53]">Soft piano continues gently between rooms.</p>
+            </div>
           </aside>
         )}
       </section>

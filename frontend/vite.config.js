@@ -4,4 +4,16 @@ import { defineConfig } from 'vite'
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  resolve: {
+    // Keep Fast Refresh and lazily mounted scenes on the same React singleton.
+    dedupe: ['react', 'react-dom'],
+  },
+  optimizeDeps: {
+    include: ['react', 'react-dom', 'react-dom/client'],
+  },
+  server: {
+    // A full page reload keeps Vite from retaining an older optimized React
+    // runtime when dependency hashes change during local development.
+    hmr: false,
+  },
 })
