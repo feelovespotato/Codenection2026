@@ -27,3 +27,8 @@ yarn-error.log*
 .idea/
 .DS_Store
 Thumbs.db
+
+# Persistent backend data, sessions and encrypted OAuth tokens
+backend/data/
+.npm-cache/
+.ui-review/

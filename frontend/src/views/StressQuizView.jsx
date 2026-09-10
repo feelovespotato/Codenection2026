@@ -1,5 +1,7 @@
+import PixelIcon from '../components/PixelIcon.jsx'
 import { useState, useRef, useEffect } from 'react'
-import { StorageService } from '../services/storage.js'
+import { useMoodify } from '../services/moodify-context.js'
+import BackendStatus from '../components/BackendStatus.jsx'
 
 const CHECKIN_OPTIONS = [
   { score: 1, emoji: '😌', label: 'Very Low', desc: 'Feeling calm, clear-headed, and well-rested.' },
@@ -63,8 +65,10 @@ const QUIZ_QUESTIONS = [
 ]
 
 export default function StressQuizView({ onCheckInComplete }) {
+  const { data, busy, run } = useMoodify()
+  const [saveError, setSaveError] = useState('')
   const [activeTab, setActiveTab] = useState('checkin') // 'checkin' | 'quiz'
-  const [selectedQuickScore, setSelectedQuickScore] = useState(3)
+  const selectedQuickScore = data?.checkin?.score ?? null
   const [quickSavedToast, setQuickSavedToast] = useState(false)
 
   // Chat Quiz State
@@ -93,13 +97,14 @@ export default function StressQuizView({ onCheckInComplete }) {
   }, [chatMessages])
 
   // Quick 1-5 Check-in Save
-  const handleQuickCheckIn = (score) => {
-    setSelectedQuickScore(score)
-    const levelMap = { 1: 'Very Low', 2: 'Low', 3: 'Moderate', 4: 'High', 5: 'Overloaded' }
-    StorageService.saveStressCheckIn(score, levelMap[score])
-    setQuickSavedToast(true)
-    onCheckInComplete?.()
-    setTimeout(() => setQuickSavedToast(false), 3000)
+  const handleQuickCheckIn = async (score) => {
+    setSaveError(''); setQuickSavedToast(false)
+    try {
+      await run('/checkins', { score })
+      setQuickSavedToast(true)
+      onCheckInComplete?.()
+      setTimeout(() => setQuickSavedToast(false), 3000)
+    } catch (failure) { setSaveError(failure.message) }
   }
 
   // Answer a question in the Quiz
@@ -148,8 +153,7 @@ export default function StressQuizView({ onCheckInComplete }) {
         tip = 'Your stress is at a typical midpoint. Plan a quiet recharge activity after your main study blocks.'
       }
 
-      StorageService.saveStressCheckIn(mappedScore, ratingLevel, updatedScores)
-      onCheckInComplete?.()
+      // The optional survey is reflection only. Only the explicit daily 1–5 check-in updates capacity.
 
       setFinalScoreSummary({ total, ratingLevel, mappedScore, tip })
       setQuizCompleted(true)
@@ -186,12 +190,16 @@ export default function StressQuizView({ onCheckInComplete }) {
 
   return (
     <div className="space-y-6">
+      <BackendStatus />
+      {saveError && <p role="alert" className="text-sm text-rose-700">{saveError}</p>}
+      {busy && <p role="status" className="text-sm text-stone-600">Saving your check-in…</p>}
       {/* Tabs */}
       <div className="flex justify-center">
         <div className="inline-flex rounded-xl bg-stone-100 p-1">
           <button
             type="button"
             onClick={() => setActiveTab('checkin')}
+            aria-pressed={activeTab === 'checkin'}
             className={`rounded-lg px-4 py-1.5 text-xs font-bold transition ${
               activeTab === 'checkin'
                 ? 'bg-white text-stone-800 shadow-sm'
@@ -203,6 +211,7 @@ export default function StressQuizView({ onCheckInComplete }) {
           <button
             type="button"
             onClick={() => setActiveTab('quiz')}
+            aria-pressed={activeTab === 'quiz'}
             className={`rounded-lg px-4 py-1.5 text-xs font-bold transition ${
               activeTab === 'quiz'
                 ? 'bg-white text-stone-800 shadow-sm'
@@ -230,6 +239,8 @@ export default function StressQuizView({ onCheckInComplete }) {
                   <button
                     key={opt.score}
                     type="button"
+                    disabled={busy || !data}
+                    aria-pressed={isSelected}
                     onClick={() => handleQuickCheckIn(opt.score)}
                     className={`flex flex-col items-center justify-center rounded-2xl border-2 p-3 transition active:scale-95 ${
                       isSelected
@@ -237,7 +248,7 @@ export default function StressQuizView({ onCheckInComplete }) {
                         : 'border-stone-200 bg-white hover:border-amber-200 hover:bg-stone-50'
                     }`}
                   >
-                    <span className="text-3xl">{opt.emoji}</span>
+                    <span className="text-3xl"><PixelIcon symbol={opt.emoji} /></span>
                     <span className="mt-1 text-xs font-black text-stone-800">{opt.score}</span>
                     <span className="text-[10px] text-stone-500">{opt.label}</span>
                   </button>
@@ -248,7 +259,7 @@ export default function StressQuizView({ onCheckInComplete }) {
             {/* Selected Option Explainer */}
             <div className="mt-6 rounded-xl bg-amber-50/60 border border-amber-200/60 p-3.5">
               <span className="text-xs font-semibold text-amber-900">
-                {CHECKIN_OPTIONS.find((o) => o.score === selectedQuickScore)?.desc}
+                {CHECKIN_OPTIONS.find((o) => o.score === selectedQuickScore)?.desc || 'Optional: choose how you feel today. Without a check-in, capacity uses objective load only.'}
               </span>
             </div>
 
@@ -264,6 +275,7 @@ export default function StressQuizView({ onCheckInComplete }) {
       {/* Tab 2: Interactive Chat Quiz */}
       {activeTab === 'quiz' && (
         <div className="mx-auto max-w-2xl">
+          <p className="mb-3 text-xs text-stone-600">Reflection only. This survey does not replace your daily check-in or change capacity.</p>
           <div className="flex h-[460px] flex-col rounded-2xl border border-stone-200 bg-stone-50/50 shadow-inner overflow-hidden">
             {/* Messages Area */}
             <div className="flex-1 overflow-y-auto p-4 space-y-3">

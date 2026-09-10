@@ -1,3 +1,4 @@
+import PixelIcon from '../components/PixelIcon.jsx'
 import { useState, useMemo } from 'react'
 import { StorageService } from '../services/storage.js'
 
@@ -62,6 +63,7 @@ export default function MoodTrackerView() {
               return (
                 <button
                   key={m.id}
+                  aria-pressed={isSelected}
                   type="button"
                   onClick={() => setSelectedMood(m.id)}
                   className={`flex flex-col items-center justify-center rounded-2xl border-2 p-3 transition active:scale-95 ${
@@ -70,7 +72,7 @@ export default function MoodTrackerView() {
                       : 'border-stone-200 bg-white text-stone-600 hover:border-amber-200 hover:bg-stone-50'
                   }`}
                 >
-                  <span className="text-3xl">{m.emoji}</span>
+                  <span className="text-3xl"><PixelIcon symbol={m.emoji} /></span>
                   <span className="mt-1 text-xs">{m.label}</span>
                 </button>
               )
@@ -118,6 +120,7 @@ export default function MoodTrackerView() {
                 return (
                   <button
                     key={tag}
+                    aria-pressed={active}
                     type="button"
                     onClick={() => toggleTag(tag)}
                     className={`rounded-xl border px-3 py-1 text-xs font-medium transition ${
@@ -178,7 +181,7 @@ export default function MoodTrackerView() {
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <span className="text-2xl">{moodItem.emoji}</span>
+                      <span className="text-2xl"><PixelIcon symbol={moodItem.emoji} /></span>
                       <div>
                         <div className="flex items-center gap-2">
                           <span className="text-sm font-bold text-stone-800">{log.mood}</span>

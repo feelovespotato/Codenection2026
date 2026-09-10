@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import PixelIcon from './components/PixelIcon.jsx'
+import { useCallback, useEffect, useState } from 'react'
 import MainGamePage from './mainpage/MainGamePage.jsx'
 import Modal from './components/Modal.jsx'
 import DiaryView from './views/DiaryView.jsx'
@@ -8,59 +9,24 @@ import BreathingView from './views/BreathingView.jsx'
 import StressQuizView from './views/StressQuizView.jsx'
 import DashboardView from './views/DashboardView.jsx'
 import SoundView from './views/SoundView.jsx'
+import { useSoundPlayer } from './services/useSoundPlayer.js'
 import InstructionsView from './views/InstructionsView.jsx'
 import { StorageService } from './services/storage.js'
 import RoomMap from './social/RoomMap.jsx'
 import SocialRoom from './social/SocialRoom.jsx'
+import { useMoodify } from './services/moodify-context.js'
 
 export default function App() {
-  const [activeModal, setActiveModal] = useState(null)
+  const [activeModal, setActiveModal] = useState(() => new URLSearchParams(window.location.search).has('calendar') ? 'calendar' : null)
   const [activeScene, setActiveScene] = useState('main')
-  const [capacity, setCapacity] = useState(() => StorageService.calculateCapacity())
+  const { data, refresh } = useMoodify()
+  const capacity = data?.capacity
   const [musicSettings, setMusicSettings] = useState(() => StorageService.getSettings())
-  const backgroundMusicRef = useRef(null)
-  const initialMusicSettingsRef = useRef(musicSettings)
-  const musicEnabledRef = useRef(musicSettings.musicEnabled)
+  const soundPlayer = useSoundPlayer(musicSettings)
+  const handleHotspot = useCallback((spotId) => console.log('Hotspot tapped:', spotId), [])
 
   useEffect(() => {
-    const initialSettings = initialMusicSettingsRef.current
-    const audio = new Audio('/audio/calm_piano.mp3')
-    audio.loop = true
-    audio.preload = 'auto'
-    audio.volume = initialSettings.musicVolume
-    audio.muted = !initialSettings.musicEnabled
-    backgroundMusicRef.current = audio
-
-    const beginAfterInteraction = () => {
-      audio.play().then(() => {
-        if (!musicEnabledRef.current) audio.pause()
-        window.removeEventListener('pointerdown', beginAfterInteraction)
-        window.removeEventListener('keydown', beginAfterInteraction)
-      }).catch(() => {})
-    }
-
-    if (initialSettings.musicEnabled) audio.play().catch(() => {})
-    window.addEventListener('pointerdown', beginAfterInteraction)
-    window.addEventListener('keydown', beginAfterInteraction)
-
-    return () => {
-      window.removeEventListener('pointerdown', beginAfterInteraction)
-      window.removeEventListener('keydown', beginAfterInteraction)
-      audio.pause()
-      audio.src = ''
-      backgroundMusicRef.current = null
-    }
-  }, [])
-
-  useEffect(() => {
-    musicEnabledRef.current = musicSettings.musicEnabled
     StorageService.saveSettings(musicSettings)
-    const audio = backgroundMusicRef.current
-    if (!audio) return
-    audio.volume = musicSettings.musicVolume
-    audio.muted = !musicSettings.musicEnabled
-    if (musicSettings.musicEnabled) audio.play().catch(() => {})
-    else audio.pause()
   }, [musicSettings])
 
   const setMusicVolume = useCallback((volume) => {
@@ -72,8 +38,8 @@ export default function App() {
   }, [])
 
   const refreshCapacity = useCallback(() => {
-    setCapacity(StorageService.calculateCapacity())
-  }, [])
+    refresh().catch(() => {})
+  }, [refresh])
 
   const closeModal = useCallback(() => {
     setActiveModal(null)
@@ -107,19 +73,19 @@ export default function App() {
 
   // Color helper for capacity pill
   const getCapacityBadge = () => {
-    const score = capacity.capacityScore
+    const score = capacity?.capacityScore ?? 0
     if (score >= 85) return 'bg-rose-500/90 text-white border-rose-400'
     if (score >= 65) return 'bg-amber-500/90 text-white border-amber-400'
     return 'bg-emerald-500/90 text-white border-emerald-400'
   }
 
   return (
-    <div className="relative h-screen w-screen overflow-hidden bg-[#0d0b12] text-[#fff8ef]" data-scene={activeScene}>
+    <div className="pixel-ui relative h-screen w-screen overflow-hidden bg-[#0d0b12] text-[#fff8ef]" data-scene={activeScene}>
       {/* Floating Top Wellness Navigation Bar */}
-      <header className="pointer-events-none absolute inset-x-0 top-0 z-40 flex items-center justify-between p-3 sm:px-6">
+      <header className="pixel-hud pointer-events-none absolute inset-x-0 top-0 z-40 flex items-center justify-between p-3 sm:px-6">
         {/* Brand & Room Title */}
-        <div className="pointer-events-auto flex items-center gap-2 rounded-2xl border border-white/15 bg-black/50 px-4 py-2 backdrop-blur-md shadow-lg">
-          <span className="text-xl">🌿</span>
+        <div className="pixel-brand pointer-events-auto flex items-center gap-2 rounded-2xl border border-white/15 bg-black/50 px-4 py-2 backdrop-blur-md shadow-lg">
+          <span className="text-xl"><PixelIcon symbol="🌿" /></span>
           <div className="hidden sm:block">
             <h1 className="text-xs font-black uppercase tracking-wider text-amber-100">Moodify</h1>
             <p className="text-[10px] text-stone-400">Mindful Capacity & Recovery</p>
@@ -129,75 +95,82 @@ export default function App() {
         {/* Quick Hub Buttons */}
         <nav
           aria-label="Moodify Quick Hub"
-          className="pointer-events-auto flex items-center gap-1.5 rounded-2xl border border-white/15 bg-black/55 p-1.5 backdrop-blur-md shadow-xl overflow-x-auto max-w-[70vw] sm:max-w-none"
+          className="pixel-nav pointer-events-auto flex items-center gap-1.5 rounded-2xl border border-white/15 bg-black/55 p-1.5 backdrop-blur-md shadow-xl overflow-x-auto max-w-[70vw] sm:max-w-none"
         >
           <button
             type="button"
             onClick={() => setActiveModal('diary')}
+            aria-current={activeModal === 'diary' ? 'page' : undefined}
             className="flex items-center gap-1.5 rounded-xl px-2.5 py-1 text-xs font-semibold text-stone-200 transition hover:bg-white/15 hover:text-white"
             title="Diary"
           >
-            <span>📖</span>
+            <span><PixelIcon symbol="📖" /></span>
             <span className="hidden md:inline">Diary</span>
           </button>
 
           <button
             type="button"
             onClick={() => setActiveModal('mood')}
+            aria-current={activeModal === 'mood' ? 'page' : undefined}
             className="flex items-center gap-1.5 rounded-xl px-2.5 py-1 text-xs font-semibold text-stone-200 transition hover:bg-white/15 hover:text-white"
             title="Mood Tracker"
           >
-            <span>😄</span>
+            <span><PixelIcon symbol="😄" /></span>
             <span className="hidden md:inline">Mood</span>
           </button>
 
           <button
             type="button"
             onClick={() => setActiveModal('calendar')}
+            aria-current={activeModal === 'calendar' ? 'page' : undefined}
             className="flex items-center gap-1.5 rounded-xl px-2.5 py-1 text-xs font-semibold text-stone-200 transition hover:bg-white/15 hover:text-white"
             title="Calendar"
           >
-            <span>📅</span>
+            <span><PixelIcon symbol="📅" /></span>
             <span className="hidden md:inline">Calendar</span>
           </button>
 
           <button
             type="button"
             onClick={() => setActiveModal('breathing')}
+            aria-current={activeModal === 'breathing' ? 'page' : undefined}
             className="flex items-center gap-1.5 rounded-xl px-2.5 py-1 text-xs font-semibold text-stone-200 transition hover:bg-white/15 hover:text-white"
             title="Breathing"
           >
-            <span>⏳</span>
+            <span><PixelIcon symbol="⏳" /></span>
             <span className="hidden md:inline">Breathe</span>
           </button>
 
           <button
             type="button"
             onClick={() => setActiveModal('stress')}
+            aria-current={activeModal === 'stress' ? 'page' : undefined}
             className="flex items-center gap-1.5 rounded-xl px-2.5 py-1 text-xs font-semibold text-stone-200 transition hover:bg-white/15 hover:text-white"
             title="Stress Check-In"
           >
-            <span>📱</span>
+            <span><PixelIcon symbol="📱" /></span>
             <span className="hidden md:inline">Check-In</span>
           </button>
 
           <button
             type="button"
             onClick={() => setActiveModal('sound')}
+            aria-current={activeModal === 'sound' ? 'page' : undefined}
             className="flex items-center gap-1.5 rounded-xl px-2.5 py-1 text-xs font-semibold text-stone-200 transition hover:bg-white/15 hover:text-white"
             title="Ambient Audio"
           >
-            <span>📻</span>
+            <span><PixelIcon symbol="📻" /></span>
             <span className="hidden md:inline">Sound</span>
           </button>
 
           <button
             type="button"
             onClick={() => setActiveModal('instructions')}
+            aria-current={activeModal === 'instructions' ? 'page' : undefined}
             className="flex items-center gap-1.5 rounded-xl px-2.5 py-1 text-xs font-semibold text-stone-200 transition hover:bg-white/15 hover:text-white"
             title="Guide"
           >
-            <span>❓</span>
+            <span><PixelIcon symbol="❓" /></span>
             <span className="hidden md:inline">Guide</span>
           </button>
         </nav>
@@ -206,11 +179,11 @@ export default function App() {
         <button
           type="button"
           onClick={() => setActiveModal('dashboard')}
-          className={`pointer-events-auto flex items-center gap-2 rounded-2xl border px-3.5 py-1.5 text-xs font-black shadow-lg backdrop-blur-md transition hover:scale-105 active:scale-95 ${getCapacityBadge()}`}
+          className={`pixel-capacity pointer-events-auto flex items-center gap-2 rounded-2xl border px-3.5 py-1.5 text-xs font-black shadow-lg backdrop-blur-md transition hover:scale-105 active:scale-95 ${getCapacityBadge()}`}
           title="Click to view Capacity Gauge & Load Shedder"
         >
           <span>Capacity:</span>
-          <span>{capacity.capacityScore}%</span>
+          <span>{capacity ? `${capacity.capacityScore}%` : '—'}</span>
         </button>
       </header>
 
@@ -219,7 +192,7 @@ export default function App() {
         <MainGamePage
           onActivity={handleActivity}
           onFeature={handleFeature}
-          onHotspot={(spotId) => console.log('Hotspot tapped:', spotId)}
+          onHotspot={handleHotspot}
           musicEnabled={musicSettings.musicEnabled}
           musicVolume={musicSettings.musicVolume}
           onMusicEnabledChange={setMusicEnabled}
@@ -322,7 +295,7 @@ export default function App() {
           onClose={closeModal}
           maxWidth="max-w-2xl"
         >
-          <SoundView />
+          <SoundView player={soundPlayer} />
         </Modal>
       )}
 

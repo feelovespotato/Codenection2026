@@ -2,6 +2,8 @@
 
 React + Vite + JS + PixiJS + Tailwind /css
 
+**Tier 1 implementation:** React now connects to an Express + SQLite backend. From the repository root, run `npm install` then `npm run dev`, and open **http://localhost:5173**. See [backend setup, Google OAuth configuration, API, and implementation limits](backend/README.md). The feature descriptions below describe product scope; the backend README records the implemented behavior.
+
 > **Your personal workload and recovery assistant — understand your capacity, rebalance your schedule, and prevent burnout before it happens.**
 
 Moodify helps students manage their workload by combining **objective calendar data** with **subjective stress signals**. Instead of being another to-do list, Moodify understands how much is on your plate, how it feels, and recommends actions to bring your workload back into balance.

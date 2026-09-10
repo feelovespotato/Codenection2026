@@ -1,3 +1,4 @@
+import PixelIcon from '../components/PixelIcon.jsx'
 export default function InstructionsView() {
   return (
     <div className="space-y-6 max-w-3xl mx-auto">
@@ -45,7 +46,7 @@ export default function InstructionsView() {
         </h4>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
           <div className="flex items-start gap-3 rounded-xl border border-stone-200 bg-white p-3.5 shadow-sm">
-            <span className="text-2xl">⏳</span>
+            <span className="text-2xl"><PixelIcon symbol="⏳" /></span>
             <div>
               <p className="font-bold text-stone-800">Hourglass (Breathing Timer)</p>
               <p className="text-stone-500 mt-0.5">Guided 4-7-8, box breathing & coherent heart pacing.</p>
@@ -53,7 +54,7 @@ export default function InstructionsView() {
           </div>
 
           <div className="flex items-start gap-3 rounded-xl border border-stone-200 bg-white p-3.5 shadow-sm">
-            <span className="text-2xl">📖</span>
+            <span className="text-2xl"><PixelIcon symbol="📖" /></span>
             <div>
               <p className="font-bold text-stone-800">Diary on Desk</p>
               <p className="text-stone-500 mt-0.5">Reflections with live sentiment analysis & prompts.</p>
@@ -61,7 +62,7 @@ export default function InstructionsView() {
           </div>
 
           <div className="flex items-start gap-3 rounded-xl border border-stone-200 bg-white p-3.5 shadow-sm">
-            <span className="text-2xl">😄</span>
+            <span className="text-2xl"><PixelIcon symbol="😄" /></span>
             <div>
               <p className="font-bold text-stone-800">Mood Tracker (Wall)</p>
               <p className="text-stone-500 mt-0.5">Log daily feelings, tags, and inspirational quotes.</p>
@@ -69,7 +70,7 @@ export default function InstructionsView() {
           </div>
 
           <div className="flex items-start gap-3 rounded-xl border border-stone-200 bg-white p-3.5 shadow-sm">
-            <span className="text-2xl">📅</span>
+            <span className="text-2xl"><PixelIcon symbol="📅" /></span>
             <div>
               <p className="font-bold text-stone-800">Calendar (Wall)</p>
               <p className="text-stone-500 mt-0.5">Categorized events: Cognitive, Social & Recharge hours.</p>
@@ -77,7 +78,7 @@ export default function InstructionsView() {
           </div>
 
           <div className="flex items-start gap-3 rounded-xl border border-stone-200 bg-white p-3.5 shadow-sm">
-            <span className="text-2xl">📱</span>
+            <span className="text-2xl"><PixelIcon symbol="📱" /></span>
             <div>
               <p className="font-bold text-stone-800">Phone (Stress Check-In)</p>
               <p className="text-stone-500 mt-0.5">One-tap 1–5 check-in & 10-question chat quiz.</p>
@@ -85,7 +86,7 @@ export default function InstructionsView() {
           </div>
 
           <div className="flex items-start gap-3 rounded-xl border border-stone-200 bg-white p-3.5 shadow-sm">
-            <span className="text-2xl">📊</span>
+            <span className="text-2xl"><PixelIcon symbol="📊" /></span>
             <div>
               <p className="font-bold text-stone-800">Bar Graph (Capacity Gauge)</p>
               <p className="text-stone-500 mt-0.5">View your Capacity Gauge, AI Load Shedder & recovery plans.</p>
@@ -93,7 +94,7 @@ export default function InstructionsView() {
           </div>
 
           <div className="flex items-start gap-3 rounded-xl border border-stone-200 bg-white p-3.5 shadow-sm">
-            <span className="text-2xl">📻</span>
+            <span className="text-2xl"><PixelIcon symbol="📻" /></span>
             <div>
               <p className="font-bold text-stone-800">Radio on Shelf</p>
               <p className="text-stone-500 mt-0.5">Play ambient rain, forest, ocean, and calm lo-fi audio.</p>
@@ -101,7 +102,7 @@ export default function InstructionsView() {
           </div>
 
           <div className="flex items-start gap-3 rounded-xl border border-stone-200 bg-white p-3.5 shadow-sm">
-            <span className="text-2xl">🪴</span>
+            <span className="text-2xl"><PixelIcon symbol="🪴" /></span>
             <div>
               <p className="font-bold text-stone-800">Houseplants & TV</p>
               <p className="text-stone-500 mt-0.5">Water your plants or watch cozy pixel animations.</p>

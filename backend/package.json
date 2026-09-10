@@ -1,0 +1,16 @@
+{
+  "name": "@moodify/backend",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --env-file-if-exists=.env --watch src/server.js",
+    "start": "node --env-file-if-exists=.env src/server.js",
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "express": "^5.1.0",
+    "google-auth-library": "^10.0.0",
+    "luxon": "^3.7.0",
+    "node-ical": "^0.25.0"
+  }
+}
