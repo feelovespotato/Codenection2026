@@ -29,7 +29,7 @@ function SuggestionCard({ kind, title, description }) {
     try {
       await run(`/proposals/${proposal.id}/apply`, { approved: true, writeToGoogle })
       setResult(null)
-      setNotice(kind === 'recovery' ? 'Recovery scheduled. It will count toward your streak after completion.' : 'Task moved. Capacity has been recalculated. Generate fresh suggestions for any further moves.')
+      setNotice(kind === 'recovery' ? 'Recovery scheduled. It will count automatically when the block ends (inferred from your calendar).' : 'Task moved. Capacity has been recalculated. Generate fresh suggestions for any further moves.')
     } catch (failure) { setError(failure.message) }
   }
   return <section className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
@@ -63,7 +63,7 @@ function SuggestionCard({ kind, title, description }) {
 export default function DashboardView({ onOpenCalendar, onOpenBreathing }) {
   const { data } = useMoodify()
   const metrics = data?.capacity
-  const total = metrics ? metrics.cognitiveHours + metrics.socialHours + metrics.rechargeHours : 0
+  const loadScale = metrics ? Math.max(0, ...metrics.breakdown.map(item => Math.abs(item.weightedLoad))) : 0
   return <div className="space-y-5">
     <BackendStatus />
     {metrics && <>
@@ -82,12 +82,20 @@ export default function DashboardView({ onOpenCalendar, onOpenBreathing }) {
             <p className="mt-3 text-xs leading-relaxed text-stone-500">Load = cognitive hours × 1.3 + social hours × 1 − recharge hours × 0.5, with a minimum of zero. All-day events block scheduling but do not imply 24 hours of work.</p>
           </section>
           <section className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
-            <h3 className="font-bold text-stone-900">Where your time goes</h3>
+            <h3 className="font-bold text-stone-900">Load by category</h3>
+            <p className="mt-2 text-sm text-stone-600">Weighted hours show each category’s contribution. Recharge reduces load.</p>
             {metrics.breakdown.map(item => <div key={item.category} className="mt-4 text-sm text-stone-700">
-              <div className="flex justify-between gap-2"><span>{labels[item.category]}</span><span>{item.hours} hrs · {total ? Math.round(item.hours / total * 100) : 0}% of time</span></div>
-              <div className="mt-1 h-2 rounded-full bg-stone-100"><div className={`h-full rounded-full ${colors[item.category]}`} style={{ width: `${total ? item.hours / total * 100 : 0}%` }} /></div>
+              <div className="flex flex-wrap justify-between gap-2"><span>{labels[item.category]} · {item.hours} hrs</span><span className="font-semibold">{item.weightedLoad > 0 ? '+' : ''}{item.weightedLoad} weighted hrs</span></div>
+              <div aria-hidden="true" className="mt-2 grid grid-cols-2 gap-px bg-stone-300">
+                <div className="flex h-2 justify-end bg-stone-100"><div className={colors[item.category]} style={{ width: `${loadScale && item.weightedLoad < 0 ? Math.abs(item.weightedLoad) / loadScale * 100 : 0}%` }} /></div>
+                <div className="h-2 bg-stone-100"><div className={`h-full ${colors[item.category]}`} style={{ width: `${loadScale && item.weightedLoad > 0 ? item.weightedLoad / loadScale * 100 : 0}%` }} /></div>
+              </div>
             </div>)}
-            <p className="mt-5 border-t border-stone-100 pt-4 text-sm font-bold text-stone-800">{metrics.recoveryStreak.currentStreak}-day recovery streak · {metrics.recoveryStreak.hasRecoveredToday ? 'Completed today' : 'No recovery completed today'}</p>
+            <div className="mt-2 flex justify-between text-xs text-stone-600"><span>Reduces load ←</span><span>→ Adds load</span></div>
+            <p className="mt-4 font-bold text-stone-800">Net load: {metrics.totalLoadHours} weighted hrs</p>
+            <p className="mt-1 text-xs text-stone-600">Category contributions are rounded. Net load has a minimum of zero.</p>
+            <p aria-live="polite" className="mt-5 border-t border-stone-100 pt-4 text-sm font-bold text-stone-800">{metrics.recoveryStreak.currentStreak}-day recovery streak · {metrics.recoveryStreak.hasRecoveredToday ? 'Recovery counted today' : 'No recovery block ended today'}</p>
+            <p className="mt-2 text-xs leading-relaxed text-stone-600">Timed recovery blocks count automatically when they end. Completion is inferred from your calendar, not verified activity. All-day events do not count.</p>
             <div className="mt-4 flex flex-wrap gap-3"><button type="button" onClick={onOpenCalendar} className={button}>Open calendar</button><button type="button" onClick={onOpenBreathing} className="rounded-xl border border-emerald-300 px-4 py-2.5 text-sm font-bold text-emerald-900">Start breathing</button></div>
           </section>
         </div>

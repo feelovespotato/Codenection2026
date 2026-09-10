@@ -131,7 +131,7 @@ export default function CalendarView() {
           <div className="mt-3 flex flex-wrap gap-2">
             <button className={secondaryClass} disabled={busy} onClick={() => { setEditing(event); setAdding(false) }}>Edit</button>
             {event.source !== 'google' && <button className={secondaryClass} disabled={busy} onClick={() => setPendingDelete(event.id)}>Delete</button>}
-            {event.category === 'recharge' && <button className={secondaryClass} disabled={busy || !!event.completedAt || Date.parse(event.end) > Date.parse(data.serverTime)} onClick={() => action(`/events/${event.id}/complete`, {}, 'Recovery completed. Your streak has been updated.')}>{event.completedAt ? 'Completed' : 'Mark recovery completed'}</button>}
+            {event.category === 'recharge' && <span className="rounded-xl bg-emerald-50 px-4 py-2.5 text-xs font-semibold text-emerald-900">{event.allDay ? 'All-day recovery does not count toward streaks' : event.recoveryStatus === 'confirmed' ? 'Recovery confirmed · counted in streak' : event.recoveryStatus === 'inferred' ? 'Auto-counted · completion inferred from calendar' : 'Counts automatically when this block ends'}</span>}
           </div>
           {pendingDelete === event.id && <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl bg-rose-50 p-3"><span>Delete this commitment from Moodify?</span><button className="rounded-lg bg-rose-700 px-3 py-2 font-semibold text-white" disabled={busy} onClick={async () => { const result = await action(`/events/${event.id}`, {}, 'Event deleted.', 'DELETE'); if (result) setPendingDelete(null) }}>Delete event</button><button className={secondaryClass} onClick={() => setPendingDelete(null)}>Keep event</button></div>}
         </article>)}
