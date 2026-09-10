@@ -5,6 +5,8 @@ import {
   Container,
   Graphics,
   Sprite,
+  Texture,
+  Rectangle,
 } from 'pixi.js'
 import {
   DOG_HEIGHT,
@@ -45,7 +47,17 @@ const assetSources = {
 
 function clickable(sprite, onPress, label) {
   sprite.eventMode = 'static'
+  sprite.cursor = 'pointer'
   sprite.label = label
+  
+  sprite.on('pointerover', () => {
+    sprite.y -= 4 // Float effect
+  })
+
+  sprite.on('pointerout', () => {
+    sprite.y += 4
+  })
+
   sprite.on('pointertap', onPress)
   return sprite
 }
@@ -116,6 +128,14 @@ export async function createMoodifyGame(canvasHost, callbacks = {}) {
   }
   ICONS.filter((icon) => icon.layer === 'behind').forEach(addIcon)
 
+  HOTSPOTS.forEach((spot) => {
+    const target = new Graphics().rect(spot.x, spot.y, spot.width, spot.height).fill({ color: 0xffffff, alpha: 0.001 })
+    target.eventMode = 'static'
+    target.cursor = 'pointer'
+    target.on('pointertap', () => callbacks.onHotspot?.(spot.id, spot))
+    scene.addChild(target)
+  })
+
   const dogIdle = [textures.dogIdle0, textures.dogIdle1, textures.dogIdle2, textures.dogIdle3]
   const dogWalk = [textures.dogWalk0, textures.dogWalk1, textures.dogWalk2, textures.dogWalk3]
   const dog = new AnimatedSprite(dogIdle)
@@ -126,6 +146,12 @@ export async function createMoodifyGame(canvasHost, callbacks = {}) {
   dog.animationSpeed = 0.095
   dog.loop = true
   dog.play()
+  const dogSound = new Audio('/audio/dog-bark.mp3')
+  dogSound.volume = 0.5
+  clickable(dog, () => {
+    dogSound.currentTime = 0
+    dogSound.play().catch(() => {})
+  }, 'Dog')
   scene.addChild(dog)
   let dogState = 'idle'
   let dogIdleElapsed = 0
@@ -153,13 +179,6 @@ export async function createMoodifyGame(canvasHost, callbacks = {}) {
   settings.height = 80
   clickable(settings, () => callbacks.onSettings?.(), 'Settings')
   scene.addChild(settings)
-
-  HOTSPOTS.forEach((spot) => {
-    const target = new Graphics().rect(spot.x, spot.y, spot.width, spot.height).fill({ color: 0xffffff, alpha: 0.001 })
-    target.eventMode = 'static'
-    target.on('pointertap', () => callbacks.onHotspot?.(spot.id, spot))
-    scene.addChild(target)
-  })
 
   let activeOverlay = null
   let wateringAnimation = null
@@ -227,6 +246,7 @@ export async function createMoodifyGame(canvasHost, callbacks = {}) {
   zones.forEach((zone) => {
     const target = new Graphics().rect(zone.x, zone.y, zone.width, zone.height).fill({ color: 0xffffff, alpha: 0.001 })
     target.eventMode = 'static'
+    target.cursor = 'pointer'
     target.on('pointertap', () => {
       callbacks.onFeature?.(zone.type, zone)
       openOverlay(zone.type)

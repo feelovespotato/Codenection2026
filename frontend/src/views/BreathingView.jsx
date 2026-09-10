@@ -173,20 +173,20 @@ export default function BreathingView() {
         })}
       </div>
 
-      <p className="max-w-md text-xs text-stone-500">{activeTech.description}</p>
-
       {/* Visual Breathing Ring */}
       <div className="relative flex h-64 w-64 items-center justify-center">
         {/* Outer ambient glow */}
         <div
-          className={`absolute inset-0 rounded-full bg-gradient-to-tr ${activeTech.color} opacity-20 blur-2xl transition-all duration-1000 ${
+          style={{ borderRadius: '50%' }}
+          className={`absolute inset-0 bg-gradient-to-tr ${activeTech.color} opacity-20 blur-2xl transition-all duration-1000 ${
             isActive ? 'scale-110' : 'scale-90'
           }`}
         />
 
         {/* Breathing Circle */}
         <div
-          className={`relative flex h-48 w-48 flex-col items-center justify-center rounded-full border-4 border-white/60 bg-gradient-to-br ${
+          style={{ borderRadius: '50%' }}
+          className={`relative flex h-48 w-48 flex-col items-center justify-center border-4 border-white/60 bg-gradient-to-br ${
             activeTech.color
           } text-white shadow-2xl transition-transform ease-in-out ${getCircleScale()}`}
         >

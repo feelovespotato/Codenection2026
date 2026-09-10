@@ -47,6 +47,10 @@ function EventForm({ date, zone, event, onDone }) {
 export default function CalendarView() {
   const { data, busy, run } = useMoodify()
   const [selectedDate, setSelectedDate] = useState('')
+  const [viewMonth, setViewMonth] = useState(() => {
+    const d = new Date()
+    return new Date(d.getFullYear(), d.getMonth(), 1)
+  })
   const [editing, setEditing] = useState(null)
   const [adding, setAdding] = useState(false)
   const [message, setMessage] = useState(() => {
@@ -93,8 +97,6 @@ export default function CalendarView() {
     {data && <>
       <section className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
         <h3 className="font-bold text-stone-900">Bring your calendar into Moodify</h3>
-        <p className="mt-1 text-sm text-stone-600">Events are classified automatically. Imported commitments stay fixed until you mark them flexible.</p>
-        <p className="mt-2 text-xs text-stone-600">Sync brings Google events here. To send a local event to your primary Google calendar, enable write access and choose Upload to Google on that event.</p>
         <div className="mt-4 flex flex-wrap items-center gap-2">
           {!data.google.connected ? <button className={buttonClass} disabled={busy || !data.google.configured} onClick={() => connect(false)}>Connect Google (read only)</button> : <>
             <button className={buttonClass} disabled={busy} onClick={() => action('/google/sync', {}, result => `Synced ${result.count} events from your primary Google calendar.`)}>Sync now</button>
@@ -114,9 +116,58 @@ export default function CalendarView() {
       {busy && <p role="status" className="text-sm text-stone-600">Saving or syncing your calendar…</p>}
       {message && <p role="status" className="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-900">{message}</p>}
       {error && <p role="alert" className="rounded-xl bg-rose-50 p-3 text-sm text-rose-900">{error}</p>}
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <label className="text-sm font-bold text-stone-800">Selected day<input type="date" value={date} onChange={e => setSelectedDate(e.target.value)} className={inputClass} /></label>
-        <div className="flex gap-2"><button className={secondaryClass} onClick={() => setSelectedDate(data.date)}>Today</button><button className={buttonClass} onClick={() => { setAdding(true); setEditing(null) }}>Add event</button></div>
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex gap-2">
+            <button className={secondaryClass} onClick={() => {
+              setSelectedDate(data.date)
+              setViewMonth(new Date(data.date.substring(0, 4), parseInt(data.date.substring(5, 7)) - 1, 1))
+            }}>Today</button>
+          </div>
+          <button className={buttonClass} onClick={() => { setAdding(true); setEditing(null) }}>Add event</button>
+        </div>
+        
+        {/* Pixel Art Warm Month Grid */}
+        <div className="rounded-2xl border-4 border-[#b56146] bg-[#fff0d4] p-4 shadow-[4px_4px_0_#6c4533] select-none">
+          <div className="flex items-center justify-between mb-4">
+            <button onClick={() => setViewMonth(new Date(viewMonth.getFullYear(), viewMonth.getMonth() - 1, 1))} className="rounded-lg border-2 border-[#8d4e36] bg-[#a85e43] px-3 py-1 text-white shadow-[2px_2px_0_#6c4533] hover:translate-y-px hover:shadow-[1px_1px_0_#6c4533] active:translate-y-0.5 active:shadow-none font-bold">◀</button>
+            <span className="font-bold text-[#5a4a42] uppercase tracking-wider text-lg">
+              {viewMonth.toLocaleString('default', { month: 'long', year: 'numeric' })}
+            </span>
+            <button onClick={() => setViewMonth(new Date(viewMonth.getFullYear(), viewMonth.getMonth() + 1, 1))} className="rounded-lg border-2 border-[#8d4e36] bg-[#a85e43] px-3 py-1 text-white shadow-[2px_2px_0_#6c4533] hover:translate-y-px hover:shadow-[1px_1px_0_#6c4533] active:translate-y-0.5 active:shadow-none font-bold">▶</button>
+          </div>
+          <div className="grid grid-cols-7 gap-1 text-center mb-2 text-xs font-bold text-[#8d5b42]">
+            <div>Su</div><div>Mo</div><div>Tu</div><div>We</div><div>Th</div><div>Fr</div><div>Sa</div>
+          </div>
+          <div className="grid grid-cols-7 gap-1">
+            {Array.from({ length: new Date(viewMonth.getFullYear(), viewMonth.getMonth(), 1).getDay() }).map((_, i) => (
+              <div key={`empty-${i}`} className="p-2" />
+            ))}
+            {Array.from({ length: new Date(viewMonth.getFullYear(), viewMonth.getMonth() + 1, 0).getDate() }).map((_, i) => {
+              const d = i + 1
+              const dateStr = `${viewMonth.getFullYear()}-${String(viewMonth.getMonth() + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+              const isSelected = dateStr === date
+              const hasEvents = (data?.events || []).some(e => localDate(e.start, zone) === dateStr)
+              
+              return (
+                <button
+                  key={d}
+                  onClick={() => setSelectedDate(dateStr)}
+                  className={`relative flex h-10 w-full flex-col items-center justify-center rounded-lg border-2 text-sm font-bold transition-all
+                    ${isSelected 
+                      ? 'border-[#a85e43] bg-[#fcd494] text-[#5a4a42] shadow-[2px_2px_0_#a85e43] translate-y-[-2px]' 
+                      : 'border-transparent text-[#5a4a42] hover:border-[#d9b984] hover:bg-[#ffe6bc]'}
+                  `}
+                >
+                  <span>{d}</span>
+                  {hasEvents && (
+                    <div className="absolute bottom-1 w-1.5 h-1.5 rounded-full bg-[#c06e52]" />
+                  )}
+                </button>
+              )
+            })}
+          </div>
+        </div>
       </div>
       {(adding || editing) && <EventForm key={editing?.id || `new-${date}`} date={date} zone={zone} event={editing} onDone={() => { setAdding(false); setEditing(null) }} />}
       <p className="text-xs text-stone-500">{events.length} commitments · {zone} · Changes are saved to the backend for this browser session.</p>

@@ -47,8 +47,7 @@ export default function Modal({ title, subtitle, icon, onClose, children, maxWid
               </span>
             )}
             <div>
-              <h2 id={titleId} className="text-lg font-bold tracking-tight text-[#2d3748] sm:text-xl">{title}</h2>
-              {subtitle && <p className="text-xs text-[#718096]">{subtitle}</p>}
+              <h2 id={titleId} className="text-2xl font-bold tracking-tight text-[#2d3748] sm:text-3xl">{title}</h2>
             </div>
           </div>
           <button

@@ -228,9 +228,6 @@ export default function StressQuizView({ onCheckInComplete }) {
         <div className="mx-auto max-w-xl space-y-6">
           <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm text-center">
             <h3 className="text-base font-bold text-stone-800">How heavy does today feel?</h3>
-            <p className="mt-1 text-xs text-stone-500">
-              Your daily check-in is the subjective ground-truth signal. It recalibrates your Capacity Gauge instantly.
-            </p>
 
             <div className="mt-6 grid grid-cols-5 gap-2">
               {CHECKIN_OPTIONS.map((opt) => {
