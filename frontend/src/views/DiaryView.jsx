@@ -1,3 +1,4 @@
+import PixelIcon from '../components/PixelIcon.jsx'
 import { useState, useMemo } from 'react'
 import { StorageService } from '../services/storage.js'
 
@@ -130,9 +131,9 @@ export default function DiaryView() {
       {/* Left Column: Diary Editor */}
       <div className="space-y-4 lg:col-span-7">
         {/* Prompt Card */}
-        <div className="flex items-start justify-between gap-3 rounded-xl border border-amber-200/80 bg-gradient-to-r from-amber-50 to-orange-50/60 p-3.5 shadow-sm">
+        <div className="pixel-inspiration flex items-start justify-between gap-3 rounded-xl border border-amber-200/80 bg-gradient-to-r from-amber-50 to-orange-50/60 p-3.5 shadow-sm">
           <div className="space-y-1">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-amber-800/80">✨ Daily Inspiration Prompt</span>
+            <span className="text-[11px] font-bold uppercase tracking-wider text-amber-800/80"><PixelIcon symbol="✨" /> Daily Inspiration Prompt</span>
             <p className="text-sm font-medium text-stone-800">"{WRITING_PROMPTS[promptIndex]}"</p>
           </div>
           <div className="flex shrink-0 gap-1.5 pt-1">
@@ -149,7 +150,7 @@ export default function DiaryView() {
               className="rounded-lg border border-amber-300/80 bg-white px-2 py-1 text-xs text-amber-900 transition hover:bg-amber-100"
               title="Shuffle prompt"
             >
-              🔄
+              <PixelIcon symbol="🔄" />
             </button>
           </div>
         </div>
@@ -159,10 +160,10 @@ export default function DiaryView() {
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-stone-100 pb-3">
             <div className="flex items-center gap-2">
               <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-semibold ${detectedEmotion.color}`}>
-                <span>{detectedEmotion.emoji}</span>
+                <span><PixelIcon symbol={detectedEmotion.emoji} /></span>
                 <span>{detectedEmotion.label}</span>
               </span>
-              <span className="text-xs text-stone-500">⛅ {weather}</span>
+              <span className="text-xs text-stone-500"><PixelIcon symbol="⛅" /> {weather}</span>
             </div>
             <div className="text-xs font-medium text-stone-400">
               <span>{wordCount} words</span>
@@ -208,7 +209,7 @@ export default function DiaryView() {
                 className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 px-5 py-2 text-sm font-semibold text-white shadow-md transition hover:from-amber-700 hover:to-orange-700 disabled:opacity-50 active:scale-95"
               >
                 <span>{editingId ? 'Update Reflection' : 'Save Reflection'}</span>
-                <span>💾</span>
+                <span><PixelIcon symbol="💾" /></span>
               </button>
             </div>
           </div>

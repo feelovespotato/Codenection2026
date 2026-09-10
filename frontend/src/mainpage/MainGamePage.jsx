@@ -69,7 +69,7 @@ export default function MainGamePage({
         )}
 
         {settingsOpen && (
-          <aside className="absolute right-3 top-[13%] w-52 border-4 border-[#3b2930] bg-[#fff0dc] p-3 text-[#251a20] shadow-2xl sm:w-64">
+          <aside className="pixel-settings absolute right-3 top-[13%] w-52 border-4 border-[#3b2930] bg-[#fff0dc] p-3 text-[#251a20] shadow-2xl sm:w-64">
             <div className="mb-2 flex items-center justify-between border-b-2 border-[#a87c66] pb-2">
               <h2 className="text-base font-black uppercase tracking-wider">Settings</h2>
               <button type="button" className="px-2 text-xl font-black" onClick={() => setSettingsOpen(false)} aria-label="Close settings">×</button>

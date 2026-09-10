@@ -1,290 +1,103 @@
-import { useState, useMemo } from 'react'
-import { StorageService } from '../services/storage.js'
+import { useState } from 'react'
+import { useMoodify } from '../services/moodify-context.js'
+import { api } from '../services/api.js'
+import { displaySlot } from '../services/dates.js'
+import BackendStatus from '../components/BackendStatus.jsx'
+
+const button = 'rounded-xl bg-amber-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-amber-800 disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-600'
+const labels = { cognitive: 'Cognitive', social: 'Social', recharge: 'Recharge' }
+const colors = { cognitive: 'bg-indigo-500', social: 'bg-amber-500', recharge: 'bg-emerald-500' }
+
+function SuggestionCard({ kind, title, description }) {
+  const { data, busy, run } = useMoodify()
+  const [result, setResult] = useState(null)
+  const [pending, setPending] = useState(false)
+  const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
+  const [writeToGoogle, setWriteToGoogle] = useState(false)
+  const stale = result && result.revision !== data.revision
+  async function suggest() {
+    setPending(true); setError(''); setNotice('')
+    try {
+      const response = await api('/proposals', { method: 'POST', body: { kind, date: data.date } })
+      setResult({ ...response, revision: data.revision })
+    } catch (failure) { setError(failure.message) }
+    finally { setPending(false) }
+  }
+  async function approve(proposal) {
+    setError(''); setNotice('')
+    try {
+      await run(`/proposals/${proposal.id}/apply`, { approved: true, writeToGoogle })
+      setResult(null)
+      setNotice(kind === 'recovery' ? 'Recovery scheduled. It will count toward your streak after completion.' : 'Task moved. Capacity has been recalculated. Generate fresh suggestions for any further moves.')
+    } catch (failure) { setError(failure.message) }
+  }
+  return <section className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
+    <h3 className="font-bold text-stone-900">{title}</h3>
+    <p className="mt-1 text-sm leading-relaxed text-stone-600">{description}</p>
+    <button type="button" className={`${button} mt-4`} disabled={pending || busy} onClick={suggest}>{pending ? 'Finding safe options…' : 'Generate suggestion'}</button>
+    {error && <p role="alert" className="mt-3 text-sm text-rose-700">{error}</p>}
+    {notice && <p role="status" className="mt-3 text-sm text-emerald-800">{notice}</p>}
+    {result?.message && <p role="status" className="mt-3 text-sm text-stone-600">{result.message}</p>}
+    {stale && <p role="status" className="mt-3 text-sm text-amber-800">Your data changed. Generate a fresh suggestion before approving.</p>}
+    {!stale && result?.proposals.map(proposal => {
+      const event = data.events.find(e => e.id === proposal.eventId)
+      const needsWrite = event?.source === 'google' && !data.google.canWrite
+      return <div key={proposal.id} className="mt-4 rounded-xl border border-amber-200 bg-amber-50/60 p-4 text-sm text-stone-800">
+        <h4 className="font-bold">{proposal.title}</h4>
+        <dl className="mt-3 space-y-2">
+          {proposal.before && <div><dt className="text-xs font-semibold uppercase text-stone-500">Before</dt><dd>{displaySlot(proposal.before, data.zone)}</dd></div>}
+          <div><dt className="text-xs font-semibold uppercase text-stone-500">{proposal.before ? 'After' : 'Available time'}</dt><dd>{displaySlot(proposal.after, data.zone)}</dd></div>
+        </dl>
+        {proposal.before && <p className="mt-3 font-semibold">Today: {proposal.beforeCapacity}% → {proposal.afterCapacity}% <span className="text-emerald-800">({proposal.beforeCapacity - proposal.afterCapacity} percentage points lower)</span></p>}
+        {proposal.targetAfter && <p className="mt-1 text-xs">Destination day load: {proposal.targetBefore.totalLoadHours} → {proposal.targetAfter.totalLoadHours} weighted hours.</p>}
+        <p className="mt-2 text-xs leading-relaxed text-stone-600">{proposal.reason}</p>
+        {kind === 'recovery' && data.google.canWrite && <label className="mt-3 flex items-center gap-2"><input type="checkbox" checked={writeToGoogle} onChange={e => setWriteToGoogle(e.target.checked)} />Also insert into Google Calendar</label>}
+        {needsWrite && <p className="mt-2 text-amber-800">Open Calendar and enable Google write access first.</p>}
+        <button type="button" className={`${button} mt-3`} disabled={busy || needsWrite} onClick={() => approve(proposal)}>{busy ? 'Applying…' : kind === 'recovery' ? `Insert into ${writeToGoogle ? 'Google Calendar' : 'Moodify calendar'}` : `Approve this move${event?.source === 'google' ? ' in Google' : ''}`}</button>
+      </div>
+    })}
+  </section>
+}
 
 export default function DashboardView({ onOpenCalendar, onOpenBreathing }) {
-  const [capacityData, setCapacityData] = useState(() => StorageService.calculateCapacity())
-  const [isShedding, setIsShedding] = useState(false)
-  const [shedApplied, setShedApplied] = useState(false)
-  const [recoveryAdded, setRecoveryAdded] = useState(false)
-
-  const {
-    capacityScore,
-    loadPercent,
-    stressPercent,
-    latestStress,
-    cognitiveHours,
-    socialHours,
-    rechargeHours,
-    eventsCount,
-    recoveryStreak,
-  } = capacityData
-
-  // Status level styling
-  const statusInfo = useMemo(() => {
-    if (capacityScore >= 85) {
-      return {
-        label: '⚠️ High Load Detected',
-        sub: 'Approaching overload. Rebalancing recommended.',
-        color: 'text-rose-700 bg-rose-50 border-rose-200',
-        barColor: 'bg-rose-500',
-      }
-    }
-    if (capacityScore >= 65) {
-      return {
-        label: '🟡 Elevated Workload',
-        sub: 'Significant commitments today. Plan recovery pauses.',
-        color: 'text-amber-700 bg-amber-50 border-amber-200',
-        barColor: 'bg-amber-500',
-      }
-    }
-    return {
-      label: '🟢 Balanced & Sustainable',
-      sub: 'Your current capacity is healthy and manageable.',
-      color: 'text-emerald-700 bg-emerald-50 border-emerald-200',
-      barColor: 'bg-emerald-500',
-    }
-  }, [capacityScore])
-
-  // Category percentages
-  const totalCategoryHours = Math.max(1, cognitiveHours + socialHours + rechargeHours)
-  const cogPct = Math.round((cognitiveHours / totalCategoryHours) * 100)
-  const socPct = Math.round((socialHours / totalCategoryHours) * 100)
-  const recPct = Math.round((rechargeHours / totalCategoryHours) * 100)
-
-  // Load Shedder Handler
-  const handleSimulateLoadShed = () => {
-    setIsShedding(true)
-    setTimeout(() => {
-      // Move a flexible task to tomorrow
-      const today = new Date().toISOString().split('T')[0]
-      const events = StorageService.getCalendarEvents()
-      const flexibleToday = events.find((e) => e.date === today && e.isFlexible)
-      
-      if (flexibleToday) {
-        const tomorrow = new Date()
-        tomorrow.setDate(tomorrow.getDate() + 1)
-        flexibleToday.date = tomorrow.toISOString().split('T')[0]
-        StorageService.saveCalendarEvent(flexibleToday)
-      }
-
-      setCapacityData(StorageService.calculateCapacity())
-      setIsShedding(false)
-      setShedApplied(true)
-    }, 600)
-  }
-
-  // Insert recovery into calendar
-  const handleInsertRecovery = () => {
-    const today = new Date().toISOString().split('T')[0]
-    const recoveryEvent = {
-      title: '🌿 Mindful Recharge Break',
-      date: today,
-      startTime: '17:30',
-      endTime: '18:15',
-      category: 'recharge',
-      isFlexible: false,
-    }
-    StorageService.saveCalendarEvent(recoveryEvent)
-    StorageService.recordRecovery('recharge', '🌿 Mindful Recharge Break')
-    setCapacityData(StorageService.calculateCapacity())
-    setRecoveryAdded(true)
-    setTimeout(() => setRecoveryAdded(false), 3000)
-  }
-
-  return (
-    <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
-      {/* Left Column: Capacity Gauge & Breakdown */}
-      <div className="space-y-6 lg:col-span-6">
-        {/* Main Capacity Gauge Card */}
-        <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-stone-500">
-              Personal Capacity Index
-            </span>
-            <span className={`rounded-full border px-3 py-1 text-xs font-bold ${statusInfo.color}`}>
-              {statusInfo.label}
-            </span>
-          </div>
-
-          {/* Big Number & Progress Bar */}
-          <div className="mt-6 flex items-baseline gap-2">
-            <span className="text-5xl font-black tracking-tight text-stone-800">{capacityScore}%</span>
-            <span className="text-xs font-semibold text-stone-400">of daily capacity utilized</span>
-          </div>
-
-          <div className="mt-4 h-3 w-full overflow-hidden rounded-full bg-stone-100">
-            <div
-              className={`h-full transition-all duration-700 ${statusInfo.barColor}`}
-              style={{ width: `${capacityScore}%` }}
-            />
-          </div>
-
-          <p className="mt-3 text-xs text-stone-500 leading-relaxed">{statusInfo.sub}</p>
-
-          {/* Objective vs Subjective Dual Signal */}
-          <div className="mt-6 grid grid-cols-2 gap-3 border-t border-stone-100 pt-4 text-xs">
-            <div className="rounded-xl bg-stone-50 p-3">
-              <div className="flex items-center justify-between text-stone-500 mb-1">
-                <span>Objective Workload</span>
-                <span className="font-bold text-stone-800">{loadPercent}%</span>
-              </div>
-              <p className="text-[11px] text-stone-400">
-                Calculated from {eventsCount} calendar tasks
-              </p>
+  const { data } = useMoodify()
+  const metrics = data?.capacity
+  const total = metrics ? metrics.cognitiveHours + metrics.socialHours + metrics.rechargeHours : 0
+  return <div className="space-y-5">
+    <BackendStatus />
+    {metrics && <>
+      <p className="text-xs text-stone-500">Today · {data.date} · {data.zone}</p>
+      <div className="grid gap-6 lg:grid-cols-2">
+        <div className="space-y-5">
+          <section className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
+            <h3 className="text-sm font-bold uppercase tracking-wide text-stone-600">Daily capacity used</h3>
+            <p className="mt-4 text-5xl font-black text-stone-900">{metrics.capacityScore}%</p>
+            <p className="mt-2 text-sm font-semibold text-stone-700">{metrics.capacityScore >= 85 ? 'High load — consider rebalancing' : metrics.capacityScore >= 65 ? 'Elevated workload — make room for rest' : 'Manageable capacity'}</p>
+            <div role="meter" aria-label="Daily capacity used" aria-valuemin={0} aria-valuemax={100} aria-valuenow={metrics.capacityScore} className="mt-4 h-3 overflow-hidden rounded-full bg-stone-100"><div className={`h-full ${metrics.capacityScore >= 85 ? 'bg-rose-500' : metrics.capacityScore >= 65 ? 'bg-amber-500' : 'bg-emerald-500'}`} style={{ width: `${metrics.capacityScore}%` }} /></div>
+            <div className="mt-5 grid grid-cols-2 gap-3 text-sm">
+              <div className="rounded-xl bg-indigo-50 p-3 text-indigo-950"><p className="font-bold">Objective load</p><p>{metrics.totalLoadHours} weighted hours</p><p className="text-xs">{metrics.loadPercent}% of an 8-hour reference</p></div>
+              <div className="rounded-xl bg-amber-50 p-3 text-amber-950"><p className="font-bold">Today’s check-in</p><p>{metrics.latestStress === null ? 'No check-in yet' : `${metrics.latestStress} / 5 stress`}</p><p className="text-xs">{metrics.latestStress === null ? 'Capacity uses load only.' : '45% load + 55% stress signal'}</p></div>
             </div>
-            <div className="rounded-xl bg-stone-50 p-3">
-              <div className="flex items-center justify-between text-stone-500 mb-1">
-                <span>Subjective Stress</span>
-                <span className="font-bold text-stone-800">{latestStress} / 5 ({stressPercent}%)</span>
-              </div>
-              <p className="text-[11px] text-stone-400">
-                Latest ground-truth check-in signal
-              </p>
-            </div>
-          </div>
+            <p className="mt-3 text-xs leading-relaxed text-stone-500">Load = cognitive hours × 1.3 + social hours × 1 − recharge hours × 0.5, with a minimum of zero. All-day events block scheduling but do not imply 24 hours of work.</p>
+          </section>
+          <section className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
+            <h3 className="font-bold text-stone-900">Where your time goes</h3>
+            {metrics.breakdown.map(item => <div key={item.category} className="mt-4 text-sm text-stone-700">
+              <div className="flex justify-between gap-2"><span>{labels[item.category]}</span><span>{item.hours} hrs · {total ? Math.round(item.hours / total * 100) : 0}% of time</span></div>
+              <div className="mt-1 h-2 rounded-full bg-stone-100"><div className={`h-full rounded-full ${colors[item.category]}`} style={{ width: `${total ? item.hours / total * 100 : 0}%` }} /></div>
+            </div>)}
+            <p className="mt-5 border-t border-stone-100 pt-4 text-sm font-bold text-stone-800">{metrics.recoveryStreak.currentStreak}-day recovery streak · {metrics.recoveryStreak.hasRecoveredToday ? 'Completed today' : 'No recovery completed today'}</p>
+            <div className="mt-4 flex flex-wrap gap-3"><button type="button" onClick={onOpenCalendar} className={button}>Open calendar</button><button type="button" onClick={onOpenBreathing} className="rounded-xl border border-emerald-300 px-4 py-2.5 text-sm font-bold text-emerald-900">Start breathing</button></div>
+          </section>
         </div>
-
-        {/* Per-Category Load Breakdown */}
-        <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm space-y-4">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-stone-600">
-            Load Distribution By Category
-          </h3>
-          <div className="space-y-3">
-            <div>
-              <div className="flex justify-between text-xs font-bold text-stone-700 mb-1">
-                <span>🧠 Cognitive ({cognitiveHours}h)</span>
-                <span>{cogPct}%</span>
-              </div>
-              <div className="h-2 w-full rounded-full bg-stone-100 overflow-hidden">
-                <div className="h-full bg-indigo-500" style={{ width: `${cogPct}%` }} />
-              </div>
-            </div>
-
-            <div>
-              <div className="flex justify-between text-xs font-bold text-stone-700 mb-1">
-                <span>👥 Social ({socialHours}h)</span>
-                <span>{socPct}%</span>
-              </div>
-              <div className="h-2 w-full rounded-full bg-stone-100 overflow-hidden">
-                <div className="h-full bg-amber-500" style={{ width: `${socPct}%` }} />
-              </div>
-            </div>
-
-            <div>
-              <div className="flex justify-between text-xs font-bold text-stone-700 mb-1">
-                <span>🌿 Recharge ({rechargeHours}h)</span>
-                <span>{recPct}%</span>
-              </div>
-              <div className="h-2 w-full rounded-full bg-stone-100 overflow-hidden">
-                <div className="h-full bg-emerald-500" style={{ width: `${recPct}%` }} />
-              </div>
-            </div>
-          </div>
-
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pt-3 border-t border-stone-100 text-xs">
-            <div className="flex items-center gap-2">
-              <span className="text-base">🔥</span>
-              <span className="font-bold text-stone-800">
-                {recoveryStreak?.currentStreak || 1}-Day Recovery Streak
-              </span>
-              {recoveryStreak?.hasRecoveredToday ? (
-                <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-extrabold text-emerald-800">
-                  Completed Today ✓
-                </span>
-              ) : (
-                <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-extrabold text-amber-800">
-                  Pending Today ⏳
-                </span>
-              )}
-            </div>
-            <button
-              type="button"
-              onClick={onOpenCalendar}
-              className="text-amber-700 hover:underline font-semibold"
-            >
-              Open Full Calendar →
-            </button>
-          </div>
+        <div className="space-y-5">
+          <SuggestionCard kind="shed" title="Load Shedder" description="Find one low-consequence flexible task that can move to a lighter day within the next three days." />
+          <SuggestionCard kind="recovery" title="Recovery Scheduler" description="Find a free slot and a recovery activity matched to today’s stress and scheduled load." />
+          <SuggestionCard kind="timetable" title="Timetable Suggester" description="Review flexible-task alternatives individually. Approve one move, then refresh the remaining suggestions." />
+          <p className="text-xs text-stone-500">Suggestions use explainable scheduling rules. Calendar gaps are an inactivity proxy; actual physical inactivity is not measured.</p>
         </div>
       </div>
-
-      {/* Right Column: AI Load Shedder & Recovery Scheduler */}
-      <div className="space-y-6 lg:col-span-6">
-        {/* Load Shedder Card */}
-        <div className="rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50/60 to-orange-50/40 p-6 shadow-sm">
-          <div className="flex items-center gap-2">
-            <span className="text-xl">🧹</span>
-            <div>
-              <h3 className="text-sm font-bold text-amber-950">AI Load Shedder</h3>
-              <p className="text-[11px] text-amber-800/80">
-                Identifies low-consequence flexible tasks to reduce immediate pressure.
-              </p>
-            </div>
-          </div>
-
-          <div className="mt-4 rounded-xl border border-amber-200/80 bg-white/80 p-4">
-            <div className="flex items-center justify-between text-xs">
-              <span className="font-bold text-stone-800">Suggested Action:</span>
-              <span className="text-[11px] font-bold text-emerald-700">▼ ~14% capacity reduction</span>
-            </div>
-            <p className="mt-1 text-xs text-stone-600">
-              Move flexible study/errand blocks from <strong>Today</strong> to <strong>Tomorrow</strong>.
-            </p>
-
-            <button
-              type="button"
-              disabled={isShedding || shedApplied}
-              onClick={handleSimulateLoadShed}
-              className="mt-3 w-full rounded-xl bg-amber-600 py-2 text-xs font-bold text-white shadow transition hover:bg-amber-700 disabled:opacity-50"
-            >
-              {isShedding ? 'Rebalancing Schedule...' : shedApplied ? '✓ Schedule Rebalanced!' : 'Apply Load Shedding'}
-            </button>
-          </div>
-        </div>
-
-        {/* AI Recovery Scheduler Card */}
-        <div className="rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50/60 to-teal-50/40 p-6 shadow-sm">
-          <div className="flex items-center gap-2">
-            <span className="text-xl">🌿</span>
-            <div>
-              <h3 className="text-sm font-bold text-emerald-950">AI Recovery Recommendation</h3>
-              <p className="text-[11px] text-emerald-800/80">
-                Restores capacity before mental fatigue accumulates.
-              </p>
-            </div>
-          </div>
-
-          <div className="mt-4 space-y-3">
-            <div className="rounded-xl border border-emerald-200/80 bg-white/80 p-4">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-stone-800">🚶 20-Minute Nature Walk & Breathing</span>
-                <span className="text-[11px] text-emerald-700 font-semibold">+15% Recovery</span>
-              </div>
-              <p className="mt-1 text-xs text-stone-500">
-                Recommended between 17:30 – 18:15 after your afternoon cognitive block.
-              </p>
-
-              <div className="mt-3 flex gap-2">
-                <button
-                  type="button"
-                  onClick={handleInsertRecovery}
-                  disabled={recoveryAdded}
-                  className="rounded-lg bg-emerald-600 px-3.5 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-60"
-                >
-                  {recoveryAdded ? '✓ Added to Calendar!' : '+ Insert into Calendar'}
-                </button>
-                <button
-                  type="button"
-                  onClick={onOpenBreathing}
-                  className="rounded-lg border border-emerald-300 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-900 hover:bg-emerald-50"
-                >
-                  Start Breathing Now 🫁
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
+    </>}
+  </div>
 }

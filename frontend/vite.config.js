@@ -12,6 +12,10 @@ export default defineConfig({
     include: ['react', 'react-dom', 'react-dom/client'],
   },
   server: {
+    host: 'localhost',
+    port: 5173,
+    strictPort: true,
+    proxy: { '/api': 'http://127.0.0.1:3001' },
     // A full page reload keeps Vite from retaining an older optimized React
     // runtime when dependency hashes change during local development.
     hmr: false,

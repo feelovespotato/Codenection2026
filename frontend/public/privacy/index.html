@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f2e0bd">
+  <meta name="description" content="How Moodify uses Google Calendar data, stores wellbeing entries, and handles privacy and deletion requests.">
+  <title>Privacy Policy · Moodify</title>
+  <link rel="stylesheet" href="/privacy/style.css">
+</head>
+<body class="privacy-page">
+  <a class="skip-link" href="#policy">Skip to privacy policy</a>
+  <main id="policy" class="policy-window">
+    <header class="policy-header">
+      <p class="eyebrow">Moodify · Productivity &amp; wellbeing</p>
+      <h1>Privacy Policy</h1>
+      <p>Last updated: 10 September 2026</p>
+      <a class="pixel-link" href="/">Return to Moodify</a>
+    </header>
+    <div class="policy-content">
+      <p class="intro">Moodify is a student productivity and wellbeing project. It combines calendar workload, optional stress check-ins, diary reflections, and recovery activities in a pixel-art room. This policy explains the current demonstration app, including access through its public ngrok address.</p>
+      <nav class="policy-nav" aria-label="Privacy policy contents">
+        <a href="#data">Data we handle</a><a href="#google">Google Calendar</a><a href="#storage">Storage &amp; retention</a><a href="#choices">Your choices</a><a href="#contact">Contact</a>
+      </nav>
+      <section id="data">
+        <h2>1. Data we handle and why</h2>
+        <ul>
+          <li><strong>Calendar commitments:</strong> titles, descriptions, start and end times, all-day status, time zone, event identifiers, and whether an event has other attendees. We use these to classify workload, calculate capacity, find free time, and propose schedule changes. The Google API response may include attendee details; Moodify stores a flag indicating other attendees rather than their names or email addresses.</li>
+          <li><strong>Scheduling preferences:</strong> categories, flexibility, consequences of deferral, deadlines, recovery completion, and proposed schedule changes. These support the calendar and recovery features.</li>
+          <li><strong>Optional wellbeing information:</strong> daily stress scores are saved by the backend. Diary text, mood logs, assessment results, local recovery activity logs, and sound settings are stored in your browser. Diary emotion detection runs in the browser.</li>
+          <li><strong>Session information:</strong> a randomly generated session cookie associates your browser with its backend data. Google authorization tokens let the app access the calendar you connect; Moodify does not ask for or store your Google password.</li>
+        </ul>
+        <p>The current classifier and scheduling suggestions use rules in the app. Calendar and diary data are not sent to an external language-model service, and are not used to train general-purpose AI models.</p>
+      </section>
+      <section id="google">
+        <h2>2. Google Calendar access</h2>
+        <p>Connecting Google is optional. You can also add local commitments or import an .ics calendar file.</p>
+        <p>The initial connection requests read-only event access (<code>calendar.events.readonly</code>) to your primary Google calendar. A sync imports eligible events from the past 30 days through the next 90 days. Moodify uses this information only to provide its calendar, workload, capacity, and recovery features.</p>
+        <p>If you choose <strong>Enable Google write access</strong>, the app requests <code>calendar.events</code> permission. Approved timetable changes can then update event times, and an approved recovery activity can be inserted when you choose to write it to Google. A suggestion alone does not change your Google calendar; each change requires your approval.</p>
+        <p>Moodify's use and transfer of information received from Google APIs will adhere to the <a href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User Data Policy</a>, including its Limited Use requirements. Google data is not sold, used for advertising, or transferred for unrelated purposes.</p>
+      </section>
+      <section id="storage">
+        <h2>3. Storage, security, and retention</h2>
+        <p>For this demo, the backend runs on the developer's computer. Its database stores calendar records, check-ins, preferences, and Google connection information. Google tokens are encrypted at rest using AES-256-GCM. Calendar records and wellbeing scores are not separately encrypted in that database. The public demo uses HTTPS through ngrok.</p>
+        <p>Browser entries remain until you delete them or clear this site's browser data. Backend session access expires after 30 days; expiry or clearing cookies does not automatically erase the associated database records. The backend keeps up to 366 daily check-ins. Successful calendar sync replaces the stored Google-event list with the current import window. Other backend records remain until removed through the app, a deletion request, or removal of the demo database.</p>
+        <p>There is no password-protected Moodify account or cross-device account recovery. Someone using the same browser profile may access its stored information. Avoid entering information you do not want stored on a demonstration service.</p>
+      </section>
+      <section id="sharing">
+        <h2>4. Services and sharing</h2>
+        <p>Google processes calendar authorization and API requests. ngrok forwards traffic to the demonstration backend and may process connection information and traffic logs under its own <a href="https://ngrok.com/privacy">privacy policy</a>. The developer can access the backend database and operational logs to operate the demo and respond to support requests; human access to Google data is limited to the circumstances allowed by Google's Limited Use requirements.</p>
+        <p>The app does not include advertising or third-party analytics trackers. The current Quiet Lounge exchanges messages and presence between open instances in the same browser storage context using BroadcastChannel. Messages are held in memory and are not stored by a chat backend or sent to a public multi-device chat service.</p>
+      </section>
+      <section id="choices">
+        <h2>5. Disconnecting and deleting data</h2>
+        <ol>
+          <li><strong>Disconnect Google:</strong> open Calendar and choose Disconnect. This removes the stored Google connection tokens and imported Google events from your current Moodify profile. It does not delete events in Google Calendar or erase other Moodify records.</li>
+          <li><strong>Revoke Google's permission:</strong> remove Moodify's connection from <a href="https://myaccount.google.com/connections">your Google Account's third-party connections</a>. Disconnecting inside Moodify does not itself revoke Google's authorization grant.</li>
+          <li><strong>Delete browser data:</strong> delete individual reflections using Diary's Delete control, or clear site data in your browser to remove locally saved diary entries, moods, assessments, and settings. Do this separately for each address you used, such as localhost and the public demo address.</li>
+          <li><strong>Request backend deletion:</strong> contact the developer below before clearing your session cookies if possible. Moodify does not store a verified email address for each browser profile, so the developer may need to help identify your session before removing the correct records. Do not email passwords, Google tokens, session cookies, or private calendar contents.</li>
+        </ol>
+        <p>Clearing browser data or revoking Google's permission alone does not erase already stored backend records. Disconnect first, and contact the developer if you want the remaining backend data removed.</p>
+      </section>
+      <section id="contact">
+        <h2>6. Contact and updates</h2>
+        <p>For privacy questions or requests to delete stored data, contact the Moodify developer: <a id="privacy-contact" href="mailto:pjppjp0880@gmail.com">pjppjp0880@gmail.com</a>.</p>
+        <p>If data-handling practices change, this page will be updated with a new date. This policy describes the current demo and does not imply that Google has verified or endorsed Moodify.</p>
+      </section>
+      <a class="pixel-link" href="/">Return to Moodify</a>
+    </div>
+  </main>
+</body>
+</html>
+

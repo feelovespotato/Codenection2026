@@ -1,307 +1,141 @@
-import { useState, useMemo } from 'react'
-import { StorageService } from '../services/storage.js'
+import { useState } from 'react'
+import { useMoodify } from '../services/moodify-context.js'
+import { displaySlot, localDate } from '../services/dates.js'
+import BackendStatus from '../components/BackendStatus.jsx'
 
-const CATEGORIES = {
-  cognitive: { label: 'Cognitive', emoji: '🧠', color: 'bg-indigo-100 text-indigo-900 border-indigo-300', dot: 'bg-indigo-500' },
-  social: { label: 'Social', emoji: '👥', color: 'bg-amber-100 text-amber-900 border-amber-300', dot: 'bg-amber-500' },
-  recharge: { label: 'Recharge', emoji: '🌿', color: 'bg-emerald-100 text-emerald-900 border-emerald-300', dot: 'bg-emerald-500' },
+const inputClass = 'mt-1 w-full rounded-xl border border-stone-300 bg-white px-3 py-2.5 text-sm text-stone-900 focus:border-amber-600 focus:outline-amber-600'
+const buttonClass = 'rounded-xl bg-amber-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-amber-800 disabled:opacity-50'
+const secondaryClass = 'rounded-xl border border-stone-300 bg-white px-3 py-2.5 text-sm font-semibold text-stone-700 hover:bg-stone-50 disabled:opacity-50'
+const categoryClass = { cognitive: 'bg-indigo-100 text-indigo-900', social: 'bg-amber-100 text-amber-900', recharge: 'bg-emerald-100 text-emerald-900' }
+
+function EventForm({ date, zone, event, onDone }) {
+  const { busy, run } = useMoodify()
+  const [error, setError] = useState('')
+  const toLocal = value => {
+    const parts = new Intl.DateTimeFormat('sv-SE', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date(value))
+    return parts.replace(' ', 'T')
+  }
+  const remote = event?.source === 'google'
+  async function save(e) {
+    e.preventDefault(); setError('')
+    const fields = Object.fromEntries(new FormData(e.currentTarget))
+    const body = { ...fields, isFlexible: fields.isFlexible === 'on' }
+    try { await run(event ? `/events/${event.id}` : '/events', body, event ? 'PATCH' : 'POST'); onDone() }
+    catch (failure) { setError(failure.message) }
+  }
+  return <form onSubmit={save} className="space-y-4 rounded-2xl border border-amber-300 bg-amber-50/50 p-5 text-sm text-stone-800">
+    <h3 className="font-bold">{event ? 'Edit event' : 'Add a commitment'}</h3>
+    {remote && <p className="text-xs">Edit classification and flexibility here. Time changes use the dashboard’s per-task approval; edit other details in Google Calendar.</p>}
+    <label className="block font-semibold">Title<input name="title" required maxLength={250} defaultValue={event?.title || ''} readOnly={remote} className={inputClass} placeholder="e.g. Algorithm lecture or grocery run" /></label>
+    {!remote && <div className="grid gap-3 sm:grid-cols-2">
+      <label className="font-semibold">Start<input name="start" type="datetime-local" required defaultValue={event ? toLocal(event.start) : `${date}T09:00`} className={inputClass} /></label>
+      <label className="font-semibold">End<input name="end" type="datetime-local" required defaultValue={event ? toLocal(event.end) : `${date}T10:00`} className={inputClass} /></label>
+    </div>}
+    <p className="text-xs text-stone-600">Times use {zone}. Choose the next date for an overnight event.</p>
+    <div className="grid gap-3 sm:grid-cols-2">
+      <label className="font-semibold">Category<select name="category" defaultValue={event?.category || 'auto'} className={inputClass}><option value="auto">Auto classify from title</option><option value="cognitive">Cognitive</option><option value="social">Social</option><option value="recharge">Recharge</option></select></label>
+      <label className="font-semibold">Consequence if deferred<select name="consequence" defaultValue={event?.consequence || 'medium'} className={inputClass}><option value="low">Low — safe to defer</option><option value="medium">Medium — review before moving</option><option value="high">High — keep in place</option></select></label>
+    </div>
+    <label className="block font-semibold">Must finish by (optional)<input type="datetime-local" name="deadline" defaultValue={event?.deadline ? toLocal(event.deadline) : ''} className={inputClass} /></label>
+    <label className="flex items-center gap-2"><input name="isFlexible" type="checkbox" defaultChecked={event?.isFlexible || false} disabled={event?.hasAttendees} />Flexible task — allow rescheduling suggestions</label>
+    {event?.hasAttendees && <p className="text-xs">Events with other attendees stay fixed.</p>}
+    {error && <p role="alert" className="text-rose-700">{error}</p>}
+    <div className="flex gap-2"><button className={buttonClass} disabled={busy}>{busy ? 'Saving…' : 'Save event'}</button><button type="button" className={secondaryClass} onClick={onDone}>Cancel</button></div>
+  </form>
 }
 
 export default function CalendarView() {
-  const [events, setEvents] = useState(() => StorageService.getCalendarEvents())
-  const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().split('T')[0])
-  
-  // New Event Form State
-  const [title, setTitle] = useState('')
-  const [category, setCategory] = useState('cognitive')
-  const [startTime, setStartTime] = useState('10:00')
-  const [endTime, setEndTime] = useState('11:30')
-  const [isFlexible, setIsFlexible] = useState(false)
-  const [isAdding, setIsAdding] = useState(false)
-
-  // Events on currently selected day
-  const dailyEvents = useMemo(() => {
-    return events
-      .filter((e) => e.date === selectedDate)
-      .sort((a, b) => (a.startTime || '00:00').localeCompare(b.startTime || '00:00'))
-  }, [events, selectedDate])
-
-  // Daily hours calculation
-  const stats = useMemo(() => {
-    let cogHours = 0
-    let socHours = 0
-    let recHours = 0
-
-    dailyEvents.forEach((evt) => {
-      const [sh, sm] = (evt.startTime || '00:00').split(':').map(Number)
-      const [eh, em] = (evt.endTime || '01:00').split(':').map(Number)
-      const duration = Math.max(0.25, (eh * 60 + em - (sh * 60 + sm)) / 60)
-
-      if (evt.category === 'cognitive') cogHours += duration
-      else if (evt.category === 'social') socHours += duration
-      else if (evt.category === 'recharge') recHours += duration
-    })
-
-    const totalHours = cogHours + socHours + recHours
-    return {
-      totalHours: totalHours.toFixed(1),
-      cogHours: cogHours.toFixed(1),
-      socHours: socHours.toFixed(1),
-      recHours: recHours.toFixed(1),
+  const { data, busy, run } = useMoodify()
+  const [selectedDate, setSelectedDate] = useState('')
+  const [editing, setEditing] = useState(null)
+  const [adding, setAdding] = useState(false)
+  const [message, setMessage] = useState(() => {
+    const params = new URLSearchParams(window.location.search)
+    const status = params.get('calendar')
+    const reasons = {
+      invalid_client: 'Google rejected the app credentials. The developer must check that the backend Client ID and Client Secret belong to the same Web application client, then restart the backend.',
+      invalid_grant: 'Google could not accept this sign-in code. Close old sign-in tabs and start Connect Google again from this page. Do not refresh or reuse the callback page.',
+      redirect_uri_mismatch: 'The callback address does not match Google Cloud. The developer must register the exact backend GOOGLE_REDIRECT_URI on the same OAuth client.',
+      access_denied: 'Google access was denied. Start Connect Google again and approve the requested calendar access.',
+      unauthorized_client: 'Google has not authorized this OAuth client for this sign-in flow. The developer must check its Web application client configuration.',
+      provider_unavailable: 'Google returned a server error while completing sign-in. Wait briefly, then start Connect Google again.',
+      network_error: 'The backend could not reach Google to finish sign-in. Check the server internet connection and retry Connect Google.',
+      token_storage_failed: 'Google approved the connection, but Moodify could not store its credentials. The developer must check the backend token-encryption configuration.',
+      exchange_failed: 'Google returned to Moodify, but the backend could not finish authorization. Retry Connect Google; if it repeats, contact the developer.',
     }
-  }, [dailyEvents])
-
-  const handleAddEvent = (e) => {
-    e.preventDefault()
-    if (!title.trim()) return
-
-    const newEvt = {
-      title: title.trim(),
-      date: selectedDate,
-      startTime,
-      endTime,
-      category,
-      isFlexible,
-    }
-
-    const updated = StorageService.saveCalendarEvent(newEvt)
-    setEvents(updated)
-    setTitle('')
-    setIsAdding(false)
+    if (status === 'failed') return reasons[params.get('reason')] || reasons.exchange_failed
+    return status === 'connected' ? 'Google connected. Select Sync now to import your events.' : status === 'denied' || status === 'failed' ? 'Google connection was not completed. You can retry or import an .ics file.' : ''
+  })
+  const [error, setError] = useState('')
+  const [pendingDelete, setPendingDelete] = useState(null)
+  const date = selectedDate || data?.date || ''
+  const zone = data?.zone || 'Asia/Kuala_Lumpur'
+  const events = (data?.events || []).filter(event => localDate(event.start, zone) <= date && localDate(Date.parse(event.end) - 1, zone) >= date).sort((a, b) => Date.parse(a.start) - Date.parse(b.start))
+  async function action(path, body, notice, method) {
+    setMessage(''); setError('')
+    try { const result = await run(path, body, method); setMessage(typeof notice === 'function' ? notice(result) : notice); return result }
+    catch (failure) { setError(failure.message); return null }
   }
-
-  const handleDeleteEvent = (id) => {
-    const updated = StorageService.deleteCalendarEvent(id)
-    setEvents(updated)
+  async function importFile(e) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    if (file.size > 800000) { setError('Choose an .ics file smaller than 800 KB.'); return }
+    try { await action('/calendar/import', { name: file.name, text: await file.text() }, result => `Imported ${result.count} events. Window: past 30 days through the next 90 days. Reimporting the same filename updates that calendar.`) }
+    catch { setError('Could not read this file. Please choose it again.') }
   }
-
-  const handleExportICS = () => {
-    let icsContent = "BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//Moodify//Wellness Calendar//EN\n"
-    events.forEach((evt) => {
-      const dt = evt.date.replace(/-/g, '')
-      const st = (evt.startTime || '09:00').replace(':', '') + '00'
-      const et = (evt.endTime || '10:00').replace(':', '') + '00'
-      icsContent += `BEGIN:VEVENT\nSUMMARY:${evt.title}\nDTSTART:${dt}T${st}\nDTEND:${dt}T${et}\nDESCRIPTION:Category: ${evt.category} | Flexible: ${evt.isFlexible ? 'Yes' : 'No'}\nEND:VEVENT\n`
-    })
-    icsContent += "END:VCALENDAR"
-
-    const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.setAttribute('download', `moodify-schedule-${selectedDate}.ics`)
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
+  async function connect(write) {
+    const result = await action('/google/connect', { write }, '')
+    if (result) window.location.assign(result.url)
   }
-
-  return (
-    <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
-      {/* Left Column: Date Picker & Daily Load Breakdown */}
-      <div className="space-y-6 lg:col-span-5">
-        {/* Date Selector */}
-        <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
-          <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-stone-500">
-            Selected Day
-          </label>
-          <input
-            type="date"
-            value={selectedDate}
-            onChange={(e) => setSelectedDate(e.target.value)}
-            className="w-full rounded-xl border border-stone-200 bg-stone-50 p-3 text-base font-semibold text-stone-800 focus:border-amber-400 focus:bg-white focus:outline-none"
-          />
-
-          {/* Quick Date Shortcuts */}
-          <div className="mt-3 flex gap-2">
-            <button
-              type="button"
-              onClick={() => setSelectedDate(new Date().toISOString().split('T')[0])}
-              className="rounded-lg bg-stone-100 px-3 py-1 text-xs font-semibold text-stone-600 hover:bg-amber-100 hover:text-amber-900"
-            >
-              Today
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                const tmrw = new Date()
-                tmrw.setDate(tmrw.getDate() + 1)
-                setSelectedDate(tmrw.toISOString().split('T')[0])
-              }}
-              className="rounded-lg bg-stone-100 px-3 py-1 text-xs font-semibold text-stone-600 hover:bg-amber-100 hover:text-amber-900"
-            >
-              Tomorrow
-            </button>
-          </div>
+  return <div className="space-y-5">
+    <BackendStatus />
+    {data && <>
+      <section className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
+        <h3 className="font-bold text-stone-900">Bring your calendar into Moodify</h3>
+        <p className="mt-1 text-sm text-stone-600">Events are classified automatically. Imported commitments stay fixed until you mark them flexible.</p>
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          {!data.google.connected ? <button className={buttonClass} disabled={busy || !data.google.configured} onClick={() => connect(false)}>Connect Google (read only)</button> : <>
+            <button className={buttonClass} disabled={busy} onClick={() => action('/google/sync', {}, result => `Synced ${result.count} events from your primary Google calendar.`)}>Sync now</button>
+            {!data.google.canWrite && <button className={secondaryClass} disabled={busy} onClick={() => connect(true)}>Enable Google write access</button>}
+            <button className={secondaryClass} disabled={busy} onClick={() => action('/google/disconnect', {}, 'Disconnected. Google events were removed from Moodify; your Google calendar was not changed.')}>Disconnect</button>
+          </>}
+          <label className={`${secondaryClass} cursor-pointer`}>Import .ics<input type="file" accept=".ics,text/calendar" aria-label="Import .ics calendar file" onChange={importFile} disabled={busy} className="mt-2 block max-w-full text-xs" /></label>
+          <a href="/api/calendar/export" className={secondaryClass}>Export .ics</a>
         </div>
-
-        {/* Workload Summary Card */}
-        <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
-          <h3 className="mb-3 text-xs font-bold uppercase tracking-wider text-stone-600">
-            Daily Workload Metrics
-          </h3>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="rounded-xl bg-stone-50 p-3">
-              <span className="text-[11px] font-medium text-stone-400">Total Scheduled</span>
-              <p className="text-xl font-black text-stone-800">{stats.totalHours} hrs</p>
-            </div>
-            <div className="rounded-xl bg-indigo-50/70 p-3">
-              <span className="text-[11px] font-medium text-indigo-500">🧠 Cognitive Load</span>
-              <p className="text-xl font-black text-indigo-900">{stats.cogHours} hrs</p>
-            </div>
-            <div className="rounded-xl bg-amber-50/70 p-3">
-              <span className="text-[11px] font-medium text-amber-600">👥 Social Load</span>
-              <p className="text-xl font-black text-amber-900">{stats.socHours} hrs</p>
-            </div>
-            <div className="rounded-xl bg-emerald-50/70 p-3">
-              <span className="text-[11px] font-medium text-emerald-600">🌿 Recharge Time</span>
-              <p className="text-xl font-black text-emerald-900">{stats.recHours} hrs</p>
-            </div>
-          </div>
-
-          <div className="mt-4 pt-4 border-t border-stone-100 flex items-center justify-between">
-            <button
-              type="button"
-              onClick={handleExportICS}
-              className="text-xs font-semibold text-stone-600 hover:text-amber-800 flex items-center gap-1.5"
-            >
-              <span>📅 Export .ics Calendar</span>
-            </button>
-          </div>
-        </div>
+        {!data.google.configured && <p className="mt-3 text-xs text-stone-600">Google connection needs OAuth setup. You can use .ics import and all local scheduling features now.</p>}
+        {data.google.connected && <p className="mt-3 text-xs text-emerald-800">Connected · {data.google.canWrite ? 'Writes enabled; each move still requires approval' : 'Read-only access'} · {data.google.lastSync ? `Last sync: ${new Date(data.google.lastSync).toLocaleString()}` : 'Not synced yet'}</p>}
+        <form className="mt-4 flex flex-wrap items-end gap-2" onSubmit={e => { e.preventDefault(); action('/preferences', { zone: new FormData(e.currentTarget).get('zone') }, 'Time zone updated.', 'PUT') }}>
+          <label className="text-xs font-semibold text-stone-600">Calendar time zone<input key={zone} name="zone" defaultValue={zone} required aria-label="Calendar time zone" className={inputClass} /></label>
+          <button className={secondaryClass} disabled={busy}>Set time zone</button>
+        </form>
+      </section>
+      {busy && <p role="status" className="text-sm text-stone-600">Saving or syncing your calendar…</p>}
+      {message && <p role="status" className="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-900">{message}</p>}
+      {error && <p role="alert" className="rounded-xl bg-rose-50 p-3 text-sm text-rose-900">{error}</p>}
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <label className="text-sm font-bold text-stone-800">Selected day<input type="date" value={date} onChange={e => setSelectedDate(e.target.value)} className={inputClass} /></label>
+        <div className="flex gap-2"><button className={secondaryClass} onClick={() => setSelectedDate(data.date)}>Today</button><button className={buttonClass} onClick={() => { setAdding(true); setEditing(null) }}>Add event</button></div>
       </div>
-
-      {/* Right Column: Events List & Quick Add */}
-      <div className="space-y-4 lg:col-span-7">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-sm font-bold uppercase tracking-wider text-stone-700">
-              Schedule for {new Date(selectedDate).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
-            </h3>
-            <span className="text-xs text-stone-400">{dailyEvents.length} scheduled commitments</span>
+      {(adding || editing) && <EventForm key={editing?.id || `new-${date}`} date={date} zone={zone} event={editing} onDone={() => { setAdding(false); setEditing(null) }} />}
+      <p className="text-xs text-stone-500">{events.length} commitments · {zone} · Changes are saved to the backend for this browser session.</p>
+      <div className="space-y-3">
+        {events.length === 0 && <p className="rounded-2xl border border-dashed border-stone-300 p-8 text-center text-sm text-stone-500">No commitments on this day. Import your calendar or add an event to calculate your load.</p>}
+        {events.map(event => <article key={event.id} className="rounded-2xl border border-stone-200 bg-white p-4 text-sm text-stone-800 shadow-sm">
+          <div className="flex flex-wrap justify-between gap-3">
+            <div className="min-w-0"><h3 className="break-words font-bold">{event.title}</h3><p className="mt-1 text-xs text-stone-600">{event.allDay ? 'All-day · ' : ''}{displaySlot(event, zone)}</p></div>
+            <span className={`h-fit rounded-full px-3 py-1 text-xs font-semibold ${categoryClass[event.category]}`}>{event.category}</span>
           </div>
-
-          <button
-            type="button"
-            onClick={() => setIsAdding(!isAdding)}
-            className="flex items-center gap-1 rounded-xl bg-amber-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-amber-700 active:scale-95"
-          >
-            <span>{isAdding ? '✕ Cancel' : '+ Add Event'}</span>
-          </button>
-        </div>
-
-        {/* Add Event Form */}
-        {isAdding && (
-          <form onSubmit={handleAddEvent} className="rounded-2xl border-2 border-amber-300 bg-amber-50/40 p-4 space-y-3 animate-in fade-in duration-150">
-            <input
-              type="text"
-              required
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Event title (e.g. Math Revision, Grocery Run, Club Call)..."
-              className="w-full rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm text-stone-800 placeholder-stone-400 focus:border-amber-500 focus:outline-none"
-            />
-
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-              <div>
-                <label className="block text-[10px] font-bold uppercase text-stone-500 mb-1">Start Time</label>
-                <input
-                  type="time"
-                  value={startTime}
-                  onChange={(e) => setStartTime(e.target.value)}
-                  className="w-full rounded-lg border border-stone-200 bg-white p-1.5 text-xs font-semibold"
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold uppercase text-stone-500 mb-1">End Time</label>
-                <input
-                  type="time"
-                  value={endTime}
-                  onChange={(e) => setEndTime(e.target.value)}
-                  className="w-full rounded-lg border border-stone-200 bg-white p-1.5 text-xs font-semibold"
-                />
-              </div>
-              <div className="sm:col-span-2">
-                <label className="block text-[10px] font-bold uppercase text-stone-500 mb-1">Category</label>
-                <select
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                  className="w-full rounded-lg border border-stone-200 bg-white p-1.5 text-xs font-semibold text-stone-700"
-                >
-                  <option value="cognitive">🧠 Cognitive (High Focus)</option>
-                  <option value="social">👥 Social (Meetings/Hangouts)</option>
-                  <option value="recharge">🌿 Recharge (Recovery/Breaks)</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between pt-1">
-              <label className="flex items-center gap-2 text-xs text-stone-600 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={isFlexible}
-                  onChange={(e) => setIsFlexible(e.target.checked)}
-                  className="rounded border-stone-300 text-amber-600 focus:ring-amber-500"
-                />
-                <span>Flexible / Low Consequence (Eligible for Load Shedding)</span>
-              </label>
-
-              <button
-                type="submit"
-                className="rounded-lg bg-amber-600 px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-amber-700"
-              >
-                Save to Schedule
-              </button>
-            </div>
-          </form>
-        )}
-
-        {/* Events Timeline */}
-        <div className="max-h-[480px] space-y-2.5 overflow-y-auto pr-1">
-          {dailyEvents.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-stone-300 p-8 text-center text-xs text-stone-400">
-              No events scheduled for this day. Free time is recovery time!
-            </div>
-          ) : (
-            dailyEvents.map((evt) => {
-              const cat = CATEGORIES[evt.category] || CATEGORIES.cognitive
-              return (
-                <div
-                  key={evt.id}
-                  className="flex items-center justify-between rounded-xl border border-stone-200 bg-white p-3.5 shadow-sm transition hover:border-amber-200 hover:shadow"
-                >
-                  <div className="flex items-center gap-3">
-                    <span className={`h-3 w-3 rounded-full ${cat.dot} shrink-0`} />
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-bold text-stone-800">{evt.title}</span>
-                        {evt.isFlexible && (
-                          <span className="rounded bg-stone-100 px-1.5 py-0.2 text-[9px] font-bold uppercase tracking-wider text-amber-800">
-                            Flexible
-                          </span>
-                        )}
-                      </div>
-                      <div className="mt-0.5 flex items-center gap-2 text-xs text-stone-400">
-                        <span>🕒 {evt.startTime} – {evt.endTime}</span>
-                        <span>•</span>
-                        <span className="font-medium text-stone-500">{cat.emoji} {cat.label}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteEvent(evt.id)}
-                    className="rounded-lg p-1.5 text-xs text-stone-400 hover:bg-rose-50 hover:text-rose-600"
-                    title="Remove event"
-                  >
-                    🗑️
-                  </button>
-                </div>
-              )
-            })
-          )}
-        </div>
+          <p className="mt-2 text-xs text-stone-500">{event.source} · {event.isFlexible ? `Flexible · ${event.consequence} consequence` : 'Fixed'} · {event.classificationReason}</p>
+          {event.deadline && <p className="mt-1 text-xs text-stone-600">Deadline: {displaySlot({ start: event.deadline, end: event.deadline }, zone).split(' → ')[0]}</p>}
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button className={secondaryClass} disabled={busy} onClick={() => { setEditing(event); setAdding(false) }}>Edit</button>
+            {event.source !== 'google' && <button className={secondaryClass} disabled={busy} onClick={() => setPendingDelete(event.id)}>Delete</button>}
+            {event.category === 'recharge' && <button className={secondaryClass} disabled={busy || !!event.completedAt || Date.parse(event.end) > Date.parse(data.serverTime)} onClick={() => action(`/events/${event.id}/complete`, {}, 'Recovery completed. Your streak has been updated.')}>{event.completedAt ? 'Completed' : 'Mark recovery completed'}</button>}
+          </div>
+          {pendingDelete === event.id && <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl bg-rose-50 p-3"><span>Delete this commitment from Moodify?</span><button className="rounded-lg bg-rose-700 px-3 py-2 font-semibold text-white" disabled={busy} onClick={async () => { const result = await action(`/events/${event.id}`, {}, 'Event deleted.', 'DELETE'); if (result) setPendingDelete(null) }}>Delete event</button><button className={secondaryClass} onClick={() => setPendingDelete(null)}>Keep event</button></div>}
+        </article>)}
       </div>
-    </div>
-  )
+    </>}
+  </div>
 }

@@ -128,6 +128,7 @@ export default function BreathingView() {
           return (
             <button
               key={tech.id}
+              aria-pressed={isSelected}
               type="button"
               onClick={() => handleSelectTechnique(tech.id)}
               className={`rounded-xl border px-4 py-2 text-xs font-bold transition active:scale-95 ${
