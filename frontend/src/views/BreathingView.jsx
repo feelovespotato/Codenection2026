@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
-import { StorageService } from '../services/storage.js'
+import { api } from '../services/api.js'
+import { useMoodify } from '../services/moodify-context.js'
 
 const TECHNIQUES = [
   {
@@ -55,7 +56,36 @@ export default function BreathingView() {
   const [completedCycles, setCompletedCycles] = useState(0)
   const [soundEnabled, setSoundEnabled] = useState(false)
 
+  const { refresh } = useMoodify()
+  const [session, setSession] = useState(null)
+  const [seconds, setSeconds] = useState(0)
+  const [pending, setPending] = useState(false)
+  const [notice, setNotice] = useState('')
+  const [error, setError] = useState('')
+  const saving = useRef(false)
   const audioRef = useRef(null)
+
+  async function startSession() {
+    setPending(true); setError(''); setNotice('')
+    try {
+      const result = await api('/recovery-sessions', { method: 'POST', body: { technique: selectedTechnique } })
+      setSession(result.session); setSeconds(0); setCompletedCycles(0); setPhaseIndex(0)
+      setPhaseSecondsLeft(activeTech.pattern[0].duration); setIsActive(true)
+    } catch (failure) { setError(failure.message) }
+    finally { setPending(false) }
+  }
+  function stopSession() { setIsActive(false); setSession(null); setSeconds(0); setNotice('Session stopped. No completion recorded.') }
+  async function completeSession() {
+    if (saving.current || !session) return
+    saving.current = true; setPending(true); setIsActive(false); setError('')
+    try {
+      await api(`/recovery-sessions/${session.id}/complete`, { method: 'POST', body: {} })
+      setSession(null); setNotice('One-minute session completed and saved. Your recovery streak is updated.')
+      await refresh()
+    } catch (failure) { setError(failure.message) }
+    finally { saving.current = false; setPending(false) }
+  }
+
 
   const activeTech = TECHNIQUES.find((t) => t.id === selectedTechnique) || TECHNIQUES[0]
   const currentPhase = activeTech.pattern[phaseIndex]
@@ -63,36 +93,35 @@ export default function BreathingView() {
   // Switch technique
   const handleSelectTechnique = (techId) => {
     const tech = TECHNIQUES.find((t) => t.id === techId) || TECHNIQUES[0]
+    stopSession()
     setSelectedTechnique(techId)
     setIsActive(false)
     setPhaseIndex(0)
     setPhaseSecondsLeft(tech.pattern[0].duration)
   }
 
-  // Timer loop
+  // Count active ticks only; stopping or leaving never submits a completion.
   useEffect(() => {
-    let interval = null
-    if (isActive) {
-      interval = setInterval(() => {
-        setPhaseSecondsLeft((prev) => {
-          if (prev <= 1) {
-            // Next phase
-            setPhaseIndex((currPhaseIdx) => {
-              const nextIdx = (currPhaseIdx + 1) % activeTech.pattern.length
-              if (nextIdx === 0) {
-                setCompletedCycles((c) => c + 1)
-                StorageService.recordRecovery('breathing', `${activeTech.name} Breathing Session`)
-              }
-              return nextIdx
-            })
-            return activeTech.pattern[(phaseIndex + 1) % activeTech.pattern.length].duration
-          }
-          return prev - 1
-        })
-      }, 1000)
-    }
+    if (!isActive) return
+    const interval = setInterval(() => {
+      setSeconds(value => value + 1)
+      if (phaseSecondsLeft > 1) setPhaseSecondsLeft(phaseSecondsLeft - 1)
+      else {
+        const next = (phaseIndex + 1) % activeTech.pattern.length
+        setPhaseIndex(next); setPhaseSecondsLeft(activeTech.pattern[next].duration)
+        if (next === 0) setCompletedCycles(value => value + 1)
+      }
+    }, 1000)
     return () => clearInterval(interval)
-  }, [isActive, phaseIndex, activeTech])
+  }, [isActive, phaseSecondsLeft, phaseIndex, activeTech])
+
+  useEffect(() => {
+    if (!isActive || seconds < 60) return
+    const timer = setTimeout(() => completeSession(), 0)
+    return () => clearTimeout(timer)
+    // Completion is guarded by the session and an in-flight ref.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seconds, isActive])
 
   // Ambient sound handling
   useEffect(() => {
@@ -130,6 +159,7 @@ export default function BreathingView() {
               key={tech.id}
               aria-pressed={isSelected}
               type="button"
+              disabled={pending || Boolean(session && seconds >= 60)}
               onClick={() => handleSelectTechnique(tech.id)}
               className={`rounded-xl border px-4 py-2 text-xs font-bold transition active:scale-95 ${
                 isSelected
@@ -188,24 +218,29 @@ export default function BreathingView() {
         })}
       </div>
 
+      <p role="status" className="text-sm">{Math.min(seconds, 60)} / 60 seconds · Finish the session to count toward your streak.</p>
+      {notice && <p role="status" className="text-sm text-emerald-800">{notice}</p>}
+      {error && <p role="alert" className="text-sm text-rose-700">{error}</p>}
       {/* Control Buttons */}
       <div className="flex items-center gap-3">
         <button
           type="button"
-          onClick={() => setIsActive(!isActive)}
+          disabled={pending}
+          onClick={isActive ? stopSession : session && seconds >= 60 ? completeSession : startSession}
           className={`flex items-center gap-2 rounded-2xl px-8 py-3 text-sm font-bold text-white shadow-lg transition active:scale-95 ${
             isActive
               ? 'bg-rose-600 hover:bg-rose-700 shadow-rose-600/20'
               : 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/20'
           }`}
         >
-          <span>{isActive ? '⏸ Pause' : '▶ Start Breathing'}</span>
+          <span>{pending ? 'Saving…' : isActive ? 'Stop session' : session && seconds >= 60 ? 'Retry saving completion' : 'Start 1-minute session'}</span>
         </button>
 
         <button
           type="button"
+          disabled={pending || Boolean(session && seconds >= 60)}
           onClick={() => {
-            setIsActive(false)
+            stopSession()
             setPhaseIndex(0)
             setPhaseSecondsLeft(activeTech.pattern[0].duration)
             setCompletedCycles(0)

@@ -1,10 +1,13 @@
 import express from 'express'
 import { randomBytes, randomUUID } from 'node:crypto'
 import { DateTime } from 'luxon'
-import { capacity, dayStart, normalizeEvent, overlaps, recovery, requireValue, streak, timetable, validZone } from './engine.js'
+import { capacity, dayStart, normalizeEvent, overlaps, recovery, recoveryStatus, requireValue, streak, timetable, validZone } from './engine.js'
 import { exportCalendar, importCalendar } from './ics.js'
+import { sleepProxy, deadlineDensity, taskBatch, batchEligible } from './tier2.js'
+import { createAI } from './ai.js'
+import { boundaryDraft, enhanceProposals } from './ai-features.js'
 
-export function createApp({ store, google, origin = 'http://localhost:5173', now = () => Date.now(), staticDirectory }) {
+export function createApp({ store, google, ai = createAI({ env: {} }), origin = 'http://localhost:5173', now = () => Date.now(), staticDirectory }) {
   const app = express()
   app.disable('x-powered-by')
   app.use('/api', (req, res, next) => {
@@ -44,12 +47,35 @@ export function createApp({ store, google, origin = 'http://localhost:5173', now
   function persist(req, data) { data.revision++; data.proposals = []; store.save(req.userId, data) }
   function snapshot(data, date) {
     date ||= DateTime.fromMillis(now(), { zone: data.zone }).toISODate()
-    return { zone: data.zone, date, serverTime: new Date(now()).toISOString(), events: data.events, checkin: data.checkins.find(c => c.date === date) || null,
-      capacity: { ...capacity(data.events, data.checkins, date, data.zone), recoveryStreak: streak(data.events, data.zone, now()) },
+    return { zone: data.zone, date, serverTime: new Date(now()).toISOString(), events: data.events.map(event => ({ ...event, recoveryStatus: recoveryStatus(event, now()) })), checkin: data.checkins.find(c => c.date === date) || null,
+      capacity: { ...capacity(data.events, data.checkins, date, data.zone), calendarRecoveryStreak: streak(data.events, data.zone, now()), recoveryStreak: streak((data.recoverySessions || []).filter(s => s.completedAt).map(s => ({ category: 'recharge', start: s.startedAt, end: s.completedAt, completedAt: s.completedAt })), data.zone, now()) },
+      insights: { sleep: sleepProxy(data.events, date, data.zone, now()), deadlines: deadlineDensity(data.events, date, data.zone) },
+      ai: ai.status(),
       revision: data.revision, google: { configured: google.configured, connected: Boolean(data.google), canWrite: Boolean(data.google?.canWrite), lastSync: data.google?.lastSync || null },
     }
   }
   app.get('/api/state', (req, res) => res.json(snapshot(store.get(req.userId), req.query.date)))
+  app.get('/api/ai/status', (_req, res) => res.json(ai.status()))
+  app.post('/api/recovery-sessions', mutate((req, res, data) => {
+    requireValue(['balance', 'relax', 'calm', 'release'].includes(req.body.technique), 'Choose a breathing technique.')
+    const session = { id: randomUUID(), technique: req.body.technique, startedAt: new Date(now()).toISOString(), durationSeconds: 60 }
+    data.recoverySessions = [...(data.recoverySessions || []).filter(s => s.completedAt), session]
+    store.save(req.userId, data)
+    res.status(201).json({ session })
+  }))
+  app.post('/api/recovery-sessions/:id/complete', mutate((req, res, data) => {
+    const session = data.recoverySessions?.find(s => s.id === req.params.id)
+    requireValue(session, 'Session not found. Start a new breathing session.', 404)
+    if (!session.completedAt) {
+      const elapsed = now() - Date.parse(session.startedAt)
+      requireValue(elapsed >= session.durationSeconds * 1000, 'Finish the full session before completing it.', 409)
+      requireValue(elapsed <= 30 * 60000, 'Session expired. Start a new breathing session.', 409)
+      session.completedAt = new Date(now()).toISOString()
+      store.save(req.userId, data)
+    }
+    res.json({ session })
+  }))
+  app.post('/api/boundary-template', async (req, res) => res.json(await boundaryDraft(ai, req.body, store.get(req.userId), req.userId)))
   app.put('/api/preferences', mutate((req, res, data) => {
     requireValue(validZone(req.body.zone), 'Choose a valid IANA time zone.')
     if (data.zone !== req.body.zone) { data.zone = req.body.zone; persist(req, data) }
@@ -60,14 +86,34 @@ export function createApp({ store, google, origin = 'http://localhost:5173', now
     requireValue(data.events.length < 12000, 'Calendar is full.', 413)
     data.events.push(event); persist(req, data); res.status(201).json({ event })
   }))
-  app.patch('/api/events/:id', mutate((req, res, data) => {
+  app.patch('/api/events/:id', mutate(async (req, res, data) => {
     const event = data.events.find(e => e.id === req.params.id)
     requireValue(event, 'Event not found.', 404)
-    // Google time/title edits must go through approved proposals; local metadata is safe to change here.
-    const input = event.source === 'google' ? { ...event, category: req.body.category ?? event.category, isFlexible: req.body.isFlexible ?? event.isFlexible, consequence: req.body.consequence ?? event.consequence, deadline: req.body.deadline ?? event.deadline } : { ...event, ...req.body }
+    const input = event.source === 'google' ? { ...event, start: req.body.start ?? event.start, end: req.body.end ?? event.end, category: req.body.category ?? event.category, isFlexible: req.body.isFlexible ?? event.isFlexible, consequence: req.body.consequence ?? event.consequence, deadline: req.body.deadline ?? event.deadline } : { ...event, ...req.body }
     const updated = normalizeEvent(input, data.zone, event)
+    if (event.source === 'google' && (updated.start !== event.start || updated.end !== event.end)) {
+      requireValue(req.body.approved === true, 'Approve saving the new times to Google Calendar.')
+      requireValue(event.googleId && event.etag, 'Sync Google before editing this event.', 409)
+      const remote = await google.move(data, event, { start: updated.start, end: updated.end })
+      updated.etag = remote.etag
+    }
     data.events = data.events.map(e => e.id === event.id ? updated : e)
     persist(req, data); res.json({ event: updated })
+  }))
+  app.post('/api/events/:id/upload-google', mutate(async (req, res, data) => {
+    requireValue(req.body.approved === true, 'Approve uploading this event first.')
+    const event = data.events.find(e => e.id === req.params.id)
+    requireValue(event, 'Event not found.', 404)
+    if (event.source === 'google') { res.json({ event }); return }
+    requireValue(event.source === 'local', 'Only local events can be uploaded directly.')
+    requireValue(data.google?.canWrite, 'Enable Google write access before uploading.', 409)
+    // Save a stable identity before the network call so retries and sync can reconcile it.
+    event.googleUploadId ||= randomUUID().replaceAll('-', '')
+    store.save(req.userId, data)
+    const remote = await google.upload(data, event)
+    Object.assign(event, { source: 'google', googleId: remote.id, etag: remote.etag })
+    persist(req, data)
+    res.json({ event })
   }))
   app.delete('/api/events/:id', mutate((req, res, data) => {
     const event = data.events.find(e => e.id === req.params.id)
@@ -100,22 +146,58 @@ export function createApp({ store, google, origin = 'http://localhost:5173', now
     const data = store.get(req.userId)
     res.set('Content-Disposition', 'attachment; filename="moodify-calendar.ics"').type('text/calendar').send(exportCalendar(data.events, data.zone))
   })
-  app.post('/api/proposals', mutate((req, res, data) => {
+  app.post('/api/proposals', mutate(async (req, res, data) => {
     const kind = req.body.kind
-    requireValue(['shed', 'timetable', 'recovery'].includes(kind), 'Unknown suggestion type.')
+    requireValue(['shed', 'timetable', 'recovery', 'batch'].includes(kind), 'Unknown suggestion type.')
     const date = req.body.date || DateTime.fromMillis(now(), { zone: data.zone }).toISODate()
     dayStart(date, data.zone)
-    const suggestions = kind === 'recovery' ? recovery(data, date, now()) : timetable(data, date, now(), kind)
+    const candidates = kind === 'batch' ? taskBatch(data, date, now()) : kind === 'recovery' ? recovery(data, date, now()) : timetable(data, date, now(), 'timetable').map(item => ({ ...item, kind }))
+    const ranked = await enhanceProposals(ai, candidates, data, date, req.userId)
+    const suggestions = kind === 'shed' ? ranked.slice(0, 1) : ranked
     const proposals = suggestions.map(item => ({ ...item, id: randomUUID(), revision: data.revision, expires: now() + 15 * 60000 }))
     data.proposals = [...data.proposals.filter(p => p.expires > now() && p.kind !== kind), ...proposals].slice(-20)
     store.save(req.userId, data)
-    res.json({ proposals, message: proposals.length ? null : kind === 'recovery' ? 'No suitable free time remains between 08:00 and 21:00 on this day.' : 'No safe move found. Mark an upcoming task flexible with low/medium consequence, or keep this schedule.' })
+    res.json({ proposals, message: proposals.length ? null : kind === 'batch' ? 'No batch available. Choose at least two upcoming flexible errands of 45 minutes or less, with low/medium consequence and a free combined block.' : kind === 'recovery' ? 'No suitable free time remains between 08:00 and 21:00 on this day.' : 'No safe move found. Mark an upcoming task flexible with low/medium consequence, or keep this schedule.' })
   }))
   app.post('/api/proposals/:id/apply', mutate(async (req, res, data) => {
     requireValue(req.body.approved === true, 'Approve this individual change first.')
     const proposal = data.proposals.find(p => p.id === req.params.id)
     requireValue(proposal && proposal.revision === data.revision && proposal.expires > now(), 'This suggestion expired or the schedule changed. Generate fresh suggestions.', 409)
     requireValue(Date.parse(proposal.after.start) > now(), 'This suggested time has passed. Generate a new suggestion.', 409)
+    if (proposal.kind === 'batch') {
+      if (proposal.individualApproval) {
+        const move = proposal.moves.find(m => m.eventId === req.body.eventId)
+        requireValue(move && !move.applied, 'Choose an unapplied move to approve.', 409)
+        const event = data.events.find(e => e.id === move.eventId)
+        requireValue(event && batchEligible(event, now()) && event.start === move.before.start && event.end === move.before.end, 'Errand changed. Generate a fresh batch.', 409)
+        requireValue(Date.parse(move.after.start) > now() && (!event.deadline || Date.parse(move.after.end) <= Date.parse(event.deadline)), 'Move has passed or crosses a deadline.', 409)
+        requireValue(!overlaps(move.after, data.events, event.id), 'The batch slot is no longer free.', 409)
+        if (event.source === 'google') {
+          requireValue(event.googleId && event.etag, 'Sync Google before moving this event.', 409)
+          const remote = await google.move(data, event, move.after)
+          event.etag = remote.etag
+        }
+        Object.assign(event, move.after)
+        move.applied = true
+        data.revision++
+        proposal.revision = data.revision
+        data.proposals = proposal.moves.every(m => m.applied) ? [] : [proposal]
+        store.save(req.userId, data)
+        res.json({ ok: true, proposal, revision: data.revision }); return
+      }
+      const ids = new Set(proposal.moves.map(move => move.eventId))
+      const remaining = data.events.filter(event => !ids.has(event.id))
+      for (const move of proposal.moves) {
+        const event = data.events.find(e => e.id === move.eventId)
+        requireValue(event && batchEligible(event, now()), 'An errand is no longer eligible. Generate a fresh batch.', 409)
+        requireValue(!event.deadline || Date.parse(move.after.end) <= Date.parse(event.deadline), 'Batch would cross a deadline.', 409)
+        requireValue(!overlaps(move.after, remaining), 'The batch slot is no longer free.', 409)
+        remaining.push({ ...event, ...move.after })
+      }
+      // Validate all moves before updating any event. No remote writes or deletions.
+      for (const move of proposal.moves) Object.assign(data.events.find(e => e.id === move.eventId), move.after)
+      persist(req, data); res.json({ ok: true }); return
+    }
     requireValue(!overlaps(proposal.after, data.events, proposal.eventId), 'That slot is no longer free. Generate new suggestions.', 409)
     if (proposal.kind === 'recovery') {
       const event = normalizeEvent({ title: proposal.title, ...proposal.after, category: 'recharge', consequence: 'low' }, data.zone)

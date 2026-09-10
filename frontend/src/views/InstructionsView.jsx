@@ -80,8 +80,8 @@ export default function InstructionsView() {
           <div className="flex items-start gap-3 rounded-xl border border-stone-200 bg-white p-3.5 shadow-sm">
             <span className="text-2xl"><PixelIcon symbol="📱" /></span>
             <div>
-              <p className="font-bold text-stone-800">Phone (Stress Check-In)</p>
-              <p className="text-stone-500 mt-0.5">One-tap 1–5 check-in & 10-question chat quiz.</p>
+              <p className="font-bold text-stone-800">Chat Rooms</p>
+              <p className="text-stone-500 mt-0.5">Browse rooms and join a chat with others.</p>
             </div>
           </div>
 
@@ -110,6 +110,7 @@ export default function InstructionsView() {
           </div>
         </div>
       </div>
+<footer className="mt-6 border-t-2 border-[#b99b78] pt-4 text-xs leading-relaxed text-stone-700" aria-label="About Moodify and privacy"><p>Moodify · Calendar workload, reflections &amp; recovery</p><a className="mt-2 inline-block font-bold underline" href="/privacy/" target="_blank" rel="noopener noreferrer">Privacy Policy<span className="sr-only"> (opens in a new tab)</span></a></footer>
     </div>
   )
 }

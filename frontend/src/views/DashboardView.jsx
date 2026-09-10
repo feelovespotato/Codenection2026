@@ -3,6 +3,7 @@ import { useMoodify } from '../services/moodify-context.js'
 import { api } from '../services/api.js'
 import { displaySlot } from '../services/dates.js'
 import BackendStatus from '../components/BackendStatus.jsx'
+import TierTwoPanel from './TierTwoPanel.jsx'
 
 const button = 'rounded-xl bg-amber-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-amber-800 disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-600'
 const labels = { cognitive: 'Cognitive', social: 'Social', recharge: 'Recharge' }
@@ -29,7 +30,7 @@ function SuggestionCard({ kind, title, description }) {
     try {
       await run(`/proposals/${proposal.id}/apply`, { approved: true, writeToGoogle })
       setResult(null)
-      setNotice(kind === 'recovery' ? 'Recovery scheduled. It will count toward your streak after completion.' : 'Task moved. Capacity has been recalculated. Generate fresh suggestions for any further moves.')
+      setNotice(kind === 'recovery' ? 'Recovery scheduled. Finish an in-app breathing session to build your completed-session streak.' : 'Task moved. Capacity has been recalculated. Generate fresh suggestions for any further moves.')
     } catch (failure) { setError(failure.message) }
   }
   return <section className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
@@ -52,6 +53,7 @@ function SuggestionCard({ kind, title, description }) {
         {proposal.before && <p className="mt-3 font-semibold">Today: {proposal.beforeCapacity}% → {proposal.afterCapacity}% <span className="text-emerald-800">({proposal.beforeCapacity - proposal.afterCapacity} percentage points lower)</span></p>}
         {proposal.targetAfter && <p className="mt-1 text-xs">Destination day load: {proposal.targetBefore.totalLoadHours} → {proposal.targetAfter.totalLoadHours} weighted hours.</p>}
         <p className="mt-2 text-xs leading-relaxed text-stone-600">{proposal.reason}</p>
+        {proposal.generation && <p className="mt-2 text-xs text-stone-600">{proposal.generation === 'ai' ? `AI ${kind === 'recovery' ? 'activity selection' : 'ranking'} · ${proposal.provider}` : 'Local scheduling rules · AI unavailable or disabled'}</p>}
         {kind === 'recovery' && data.google.canWrite && <label className="mt-3 flex items-center gap-2"><input type="checkbox" checked={writeToGoogle} onChange={e => setWriteToGoogle(e.target.checked)} />Also insert into Google Calendar</label>}
         {needsWrite && <p className="mt-2 text-amber-800">Open Calendar and enable Google write access first.</p>}
         <button type="button" className={`${button} mt-3`} disabled={busy || needsWrite} onClick={() => approve(proposal)}>{busy ? 'Applying…' : kind === 'recovery' ? `Insert into ${writeToGoogle ? 'Google Calendar' : 'Moodify calendar'}` : `Approve this move${event?.source === 'google' ? ' in Google' : ''}`}</button>
@@ -63,11 +65,18 @@ function SuggestionCard({ kind, title, description }) {
 export default function DashboardView({ onOpenCalendar, onOpenBreathing }) {
   const { data } = useMoodify()
   const metrics = data?.capacity
-  const total = metrics ? metrics.cognitiveHours + metrics.socialHours + metrics.rechargeHours : 0
+  const loadScale = metrics ? Math.max(0, ...metrics.breakdown.map(item => Math.abs(item.weightedLoad))) : 0
   return <div className="space-y-5">
     <BackendStatus />
     {metrics && <>
       <p className="text-xs text-stone-500">Today · {data.date} · {data.zone}</p>
+      <section className="rounded-xl border border-stone-200 bg-white p-4 text-sm text-stone-700">
+        <h3 className="font-bold">AI assistance</h3>
+        <p className="mt-2">{data.ai?.configured ? 'AI is configured with automatic provider fallback. Rules still validate every calendar move.' : 'Local rules and templates are active. Add provider keys on the backend to enable AI.'}</p>
+        {data.ai?.providers && <p className="mt-2 text-xs">{data.ai.providers.map(p => `${p.label}: ${{ ready: 'configured', missing_key: 'no key', cooldown: 'temporarily unavailable', paid_disabled: 'paid access disabled', disabled: 'disabled' }[p.state] || p.state}`).join(' · ')}</p>}
+        {data.ai?.unknownProviders?.length > 0 && <p className="mt-2 text-xs text-amber-800">Unknown provider names in configuration: {data.ai.unknownProviders.join(', ')}</p>}
+        <p className="mt-2 text-xs">Scheduling AI receives stress and category totals, plus proposed workload changes. Calendar titles and diary entries are not sent for scheduling. Boundary Guard sends only its draft context.</p>
+      </section>
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="space-y-5">
           <section className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
@@ -82,13 +91,21 @@ export default function DashboardView({ onOpenCalendar, onOpenBreathing }) {
             <p className="mt-3 text-xs leading-relaxed text-stone-500">Load = cognitive hours × 1.3 + social hours × 1 − recharge hours × 0.5, with a minimum of zero. All-day events block scheduling but do not imply 24 hours of work.</p>
           </section>
           <section className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
-            <h3 className="font-bold text-stone-900">Where your time goes</h3>
+            <h3 className="font-bold text-stone-900">Load by category</h3>
+            <p className="mt-2 text-sm text-stone-600">Weighted hours show each category’s contribution. Recharge reduces load.</p>
             {metrics.breakdown.map(item => <div key={item.category} className="mt-4 text-sm text-stone-700">
-              <div className="flex justify-between gap-2"><span>{labels[item.category]}</span><span>{item.hours} hrs · {total ? Math.round(item.hours / total * 100) : 0}% of time</span></div>
-              <div className="mt-1 h-2 rounded-full bg-stone-100"><div className={`h-full rounded-full ${colors[item.category]}`} style={{ width: `${total ? item.hours / total * 100 : 0}%` }} /></div>
+              <div className="flex flex-wrap justify-between gap-2"><span>{labels[item.category]} · {item.hours} hrs</span><span className="font-semibold">{item.weightedLoad > 0 ? '+' : ''}{item.weightedLoad} weighted hrs</span></div>
+              <div aria-hidden="true" className="mt-2 grid grid-cols-2 gap-px bg-stone-300">
+                <div className="flex h-2 justify-end bg-stone-100"><div className={colors[item.category]} style={{ width: `${loadScale && item.weightedLoad < 0 ? Math.abs(item.weightedLoad) / loadScale * 100 : 0}%` }} /></div>
+                <div className="h-2 bg-stone-100"><div className={`h-full ${colors[item.category]}`} style={{ width: `${loadScale && item.weightedLoad > 0 ? item.weightedLoad / loadScale * 100 : 0}%` }} /></div>
+              </div>
             </div>)}
-            <p className="mt-5 border-t border-stone-100 pt-4 text-sm font-bold text-stone-800">{metrics.recoveryStreak.currentStreak}-day recovery streak · {metrics.recoveryStreak.hasRecoveredToday ? 'Completed today' : 'No recovery completed today'}</p>
-            <div className="mt-4 flex flex-wrap gap-3"><button type="button" onClick={onOpenCalendar} className={button}>Open calendar</button><button type="button" onClick={onOpenBreathing} className="rounded-xl border border-emerald-300 px-4 py-2.5 text-sm font-bold text-emerald-900">Start breathing</button></div>
+            <div className="mt-2 flex justify-between text-xs text-stone-600"><span>Reduces load ←</span><span>→ Adds load</span></div>
+            <p className="mt-4 font-bold text-stone-800">Net load: {metrics.totalLoadHours} weighted hrs</p>
+            <p className="mt-1 text-xs text-stone-600">Category contributions are rounded. Net load has a minimum of zero.</p>
+            <p aria-live="polite" className="mt-5 border-t border-stone-100 pt-4 text-sm font-bold text-stone-800">{metrics.recoveryStreak.currentStreak}-day recovery streak · {metrics.recoveryStreak.hasRecoveredToday ? 'Session completed today' : 'No session completed today'}</p>
+            <p className="mt-2 text-xs leading-relaxed text-stone-600">This streak counts completed one-minute breathing sessions saved by the backend. It records in-app completion, not measured physical recovery.</p>
+            <p className="mt-2 text-xs text-stone-600">Calendar-based streak: {metrics.calendarRecoveryStreak?.currentStreak || 0} days (inferred from ended blocks).</p><div className="mt-4 flex flex-wrap gap-3"><button type="button" onClick={onOpenCalendar} className={button}>Open calendar</button><button type="button" onClick={onOpenBreathing} className="rounded-xl border border-emerald-300 px-4 py-2.5 text-sm font-bold text-emerald-900">Start breathing</button></div>
           </section>
         </div>
         <div className="space-y-5">
@@ -98,6 +115,7 @@ export default function DashboardView({ onOpenCalendar, onOpenBreathing }) {
           <p className="text-xs text-stone-500">Suggestions use explainable scheduling rules. Calendar gaps are an inactivity proxy; actual physical inactivity is not measured.</p>
         </div>
       </div>
+      <TierTwoPanel />
     </>}
   </div>
 }
