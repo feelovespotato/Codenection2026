@@ -127,8 +127,17 @@ export function recovery(data, date, now = Date.now()) {
   const title = highStress ? 'Quiet breathing & grounding break' : metrics.cognitiveHours >= metrics.socialHours ? 'Screen-free walk & stretch' : 'Quiet solo recharge'
   return [{ kind: 'recovery', title, after: slot, reason: highStress ? 'Matched to your high stress check-in; a short quiet break in available time.' : longBlock ? 'A movement/rest opportunity after a long scheduled block (calendar-based inactivity proxy).' : 'A preventive recovery break matched to your available time and load mix.' }]
 }
+export function recoveryStatus(event, now = Date.now()) {
+  if (event.category !== 'recharge' || event.allDay) return null
+  const end = Date.parse(event.end)
+  if (!Number.isFinite(end) || end <= Date.parse(event.start) || end > now) return 'scheduled'
+  return event.completedAt ? 'confirmed' : 'inferred'
+}
 export function streak(events, zone, now = Date.now()) {
-  const dates = new Set(events.filter(e => e.category === 'recharge' && e.completedAt).map(e => DateTime.fromISO(e.completedAt).setZone(zone).toISODate()))
+  // Derive from persisted events so elapsed blocks count even while the app was closed.
+  // Use the block's end day, not the day the user opens the app or confirms it.
+  const ended = events.filter(e => ['confirmed', 'inferred'].includes(recoveryStatus(e, now)))
+  const dates = new Set(ended.map(e => DateTime.fromISO(e.end).setZone(zone).toISODate()))
   let day = DateTime.fromMillis(now, { zone }).startOf('day')
   const hasRecoveredToday = dates.has(day.toISODate())
   if (!hasRecoveredToday) day = day.minus({ days: 1 })

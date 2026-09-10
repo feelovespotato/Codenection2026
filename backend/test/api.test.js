@@ -128,6 +128,10 @@ test('recovery insertion is not completion and cannot overlap the current schedu
   const block = state.events.find(e => e.category === 'recharge')
   assert.equal((await request(`/events/${block.id}/complete`, {})).status, 400)
   advance(4 * 3600000)
+  const automatic = (await request('/state')).data
+  assert.equal(automatic.capacity.recoveryStreak.currentStreak, 1)
+  assert.equal(automatic.events.find(e => e.id === block.id).recoveryStatus, 'inferred')
+  assert.equal(automatic.events.find(e => e.id === block.id).completedAt, null)
   assert.equal((await request(`/events/${block.id}/complete`, {})).status, 200)
   assert.equal((await request('/state')).data.capacity.recoveryStreak.currentStreak, 1)
 })

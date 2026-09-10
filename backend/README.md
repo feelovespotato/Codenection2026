@@ -51,7 +51,11 @@ Google calls have timeouts. Task updates use the imported ETag to reject concurr
 
 Scheduling and classification are **rule-based**, not LLM calls. No model key is required and no calendar text is sent to an AI provider. These are workload heuristics, not calibrated health measurements. All-day entries occupy scheduling time but contribute zero duration-based load, since an all-day deadline does not imply 24 hours of effort.
 
-New sessions start empty. Existing diary/mood/settings continue using browser storage. Legacy demo calendar/check-in values are not silently copied into real backend data. A recovery block being scheduled is not proof of completion; the dashboard streak uses completed recovery records only.
+New sessions start empty. Existing diary/mood/settings continue using browser storage. Legacy demo calendar/check-in values are not silently copied into real backend data.
+
+The category breakdown displays signed weighted hours: Cognitive and Social add load, Recharge offsets it, and net load is clamped at zero. Bars use a shared scale with negative contributions left of zero and positive contributions right of zero.
+
+Recovery streaks automatically count timed Recharge events once their end time passes, using the end date in the user's calendar time zone. Multiple blocks on one day count as one streak day; future, ongoing and all-day blocks do not count. Completion is inferred from calendar timing, not proof the activity happened. No confirmation click is required. State responses recalculate from saved events, so reopening the app catches up without a background job; the frontend also refreshes each minute and on focus. Calendar edits, deletion or sync can revise the inferred streak. Existing explicit completion records remain distinguished as confirmed, but use the event's end date for streak attribution.
 
 ## ICS behavior
 

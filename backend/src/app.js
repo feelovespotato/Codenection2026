@@ -1,7 +1,7 @@
 import express from 'express'
 import { randomBytes, randomUUID } from 'node:crypto'
 import { DateTime } from 'luxon'
-import { capacity, dayStart, normalizeEvent, overlaps, recovery, requireValue, streak, timetable, validZone } from './engine.js'
+import { capacity, dayStart, normalizeEvent, overlaps, recovery, recoveryStatus, requireValue, streak, timetable, validZone } from './engine.js'
 import { exportCalendar, importCalendar } from './ics.js'
 
 export function createApp({ store, google, origin = 'http://localhost:5173', now = () => Date.now(), staticDirectory }) {
@@ -44,7 +44,7 @@ export function createApp({ store, google, origin = 'http://localhost:5173', now
   function persist(req, data) { data.revision++; data.proposals = []; store.save(req.userId, data) }
   function snapshot(data, date) {
     date ||= DateTime.fromMillis(now(), { zone: data.zone }).toISODate()
-    return { zone: data.zone, date, serverTime: new Date(now()).toISOString(), events: data.events, checkin: data.checkins.find(c => c.date === date) || null,
+    return { zone: data.zone, date, serverTime: new Date(now()).toISOString(), events: data.events.map(event => ({ ...event, recoveryStatus: recoveryStatus(event, now()) })), checkin: data.checkins.find(c => c.date === date) || null,
       capacity: { ...capacity(data.events, data.checkins, date, data.zone), recoveryStreak: streak(data.events, data.zone, now()) },
       revision: data.revision, google: { configured: google.configured, connected: Boolean(data.google), canWrite: Boolean(data.google?.canWrite), lastSync: data.google?.lastSync || null },
     }

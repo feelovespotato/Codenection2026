@@ -71,9 +71,33 @@ test('recovery matches stress and does not overlap commitments or precede now', 
   assert.equal(overlaps(proposal.after, items), false)
   assert.ok(Date.parse(proposal.after.start) >= now)
 })
-test('streak starts at zero and scheduled recovery does not imply completion', () => {
+test('streak counts recovery exactly at its end, without confirmation or double counting', () => {
   const item = event('Walk', '17:00', '17:30')
   assert.equal(streak([item], zone, now).currentStreak, 0)
-  item.completedAt = new Date(now).toISOString()
-  assert.equal(streak([item], zone, now).currentStreak, 1)
+  const end = Date.parse(item.end)
+  assert.equal(streak([item], zone, end - 1).currentStreak, 0)
+  assert.equal(streak([item, item], zone, end).currentStreak, 1)
+  item.completedAt = new Date(end + 86400000).toISOString()
+  assert.deepEqual(streak([item], zone, end + 86400000), { currentStreak: 1, hasRecoveredToday: false })
+})
+test('automatic streak respects local end dates, missed days and all-day exclusions', () => {
+  const block = (start, end, extra = {}) => normalizeEvent({ title: 'Walk', start, end, ...extra }, zone)
+  const items = [
+    block('2026-09-08T23:50:00+08:00', '2026-09-09T00:10:00+08:00'),
+    block('2026-09-10T07:00:00+08:00', '2026-09-10T07:30:00+08:00'),
+    block('2026-09-10T00:00:00+08:00', '2026-09-11T00:00:00+08:00', { allDay: true }),
+  ]
+  assert.equal(streak(items, zone, now).currentStreak, 2)
+  assert.equal(streak(items, zone, now + 86400000).currentStreak, 2)
+  assert.equal(streak(items, zone, now + 2 * 86400000).currentStreak, 0)
+  assert.equal(streak([], zone, now).currentStreak, 0)
+  assert.equal(streak([event('Study', '06:00', '07:00')], zone, now).currentStreak, 0)
+})
+test('breakdown exposes signed category contributions including recharge-only days', () => {
+  const metrics = capacity([event('Study', '09:00', '11:00'), event('Club', '12:00', '13:00'), event('Walk', '14:00', '15:00')], [], '2026-09-10', zone)
+  assert.deepEqual(metrics.breakdown.map(item => item.weightedLoad), [2.6, 1, -0.5])
+  assert.equal(metrics.totalLoadHours, 3.1)
+  const recharge = capacity([event('Walk', '14:00', '15:00')], [], '2026-09-10', zone)
+  assert.equal(recharge.totalLoadHours, 0)
+  assert.equal(recharge.breakdown[2].weightedLoad, -0.5)
 })
