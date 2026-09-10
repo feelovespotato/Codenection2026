@@ -76,7 +76,7 @@ export function createGoogle(config, cipher) {
         const response = await request(data, '/events', { params: { timeMin: from, timeMax: to, singleEvents: true, showDeleted: false, maxResults: 2500, pageToken } })
         for (const event of response.items || []) {
           if (event.status === 'cancelled' || event.transparency === 'transparent' || event.attendees?.some(a => a.self && a.responseStatus === 'declined')) continue
-          const previous = data.events.find(item => item.source === 'google' && item.googleId === event.id)
+          const previous = data.events.find(item => (item.source === 'google' && item.googleId === event.id) || (item.source === 'local' && item.googleUploadId === event.id && event.extendedProperties?.private?.moodifyLocalEvent === item.id))
           const allDay = Boolean(event.start.date)
           const start = allDay ? DateTime.fromISO(event.start.date, { zone: data.zone }).toISO() : event.start.dateTime
           const end = allDay ? DateTime.fromISO(event.end.date, { zone: data.zone }).toISO() : event.end.dateTime
@@ -89,16 +89,39 @@ export function createGoogle(config, cipher) {
         requireValue(imported.length <= 10000, 'Too many Google events in the sync window. Use a smaller calendar.', 413)
         pageToken = response.nextPageToken
       } while (pageToken)
-      data.events = [...data.events.filter(e => e.source !== 'google'), ...imported]
+      const importedIds = new Set(imported.map(e => e.id))
+      data.events = [...data.events.filter(e => e.source !== 'google' && !importedIds.has(e.id)), ...imported]
       data.google.lastSync = new Date(now).toISOString()
       return imported.length
+    },
+    async upload(data, event) {
+      requireValue(data.google?.canWrite, 'Enable Google write access before uploading.', 409)
+      const id = event.googleUploadId
+      requireValue(/^[a-f0-9]{32}$/.test(id || ''), 'Invalid upload identity.')
+      const times = event.allDay ? {
+        start: { date: DateTime.fromISO(event.start).setZone(data.zone).toISODate() },
+        end: { date: DateTime.fromISO(event.end).setZone(data.zone).toISODate() },
+      } : { start: { dateTime: event.start }, end: { dateTime: event.end } }
+      try {
+        return await request(data, '/events', { method: 'POST', params: { sendUpdates: 'none' }, data: {
+          id, summary: event.title, description: event.description, ...times,
+          extendedProperties: { private: { moodifyLocalEvent: event.id } },
+        } })
+      } catch (error) {
+        const existing = await request(data, `/events/${id}`).catch(() => null)
+        if (existing?.status !== 'cancelled' && existing?.extendedProperties?.private?.moodifyLocalEvent === event.id) return existing
+        throw error
+      }
     },
     async move(data, event, after) {
       requireValue(data.google?.canWrite, 'Reconnect Google with write access to approve this move.', 409)
       await ensureFree(data, after, event.googleId)
       return request(data, `/events/${encodeURIComponent(event.googleId)}`, {
         method: 'PATCH', headers: { 'If-Match': event.etag }, params: { sendUpdates: 'none' },
-        data: { start: { dateTime: after.start }, end: { dateTime: after.end } },
+        data: event.allDay ? {
+          start: { date: DateTime.fromISO(after.start).setZone(data.zone).toISODate() },
+          end: { date: DateTime.fromISO(after.end).setZone(data.zone).toISODate() },
+        } : { start: { dateTime: after.start }, end: { dateTime: after.end } },
       })
     },
     async insert(data, event, proposalId) {

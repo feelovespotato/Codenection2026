@@ -105,3 +105,56 @@ test('OAuth read-only mode requests the narrow scope and write mode is explicit'
   assert.equal(read.searchParams.get('scope'), 'https://www.googleapis.com/auth/calendar.events.readonly')
   assert.equal(new URL(google.authUrl('state-value', true)).searchParams.get('scope'), 'https://www.googleapis.com/auth/calendar.events')
 })
+
+test('direct upload preserves event fields and recovers a lost response with the same Google ID', async t => {
+  const data = profile()
+  const item = { id: 'local-id', googleUploadId: 'a'.repeat(32), title: 'Gathering', description: 'My description', start: '2026-09-10T09:00:00Z', end: '2026-09-10T09:30:00Z' }
+  let saved
+  let posts = 0
+  t.mock.method(OAuth2Client.prototype, 'request', async options => {
+    if (options.method === 'POST') {
+      posts++
+      saved ||= { ...options.data, etag: 'v1' }
+      assert.equal(options.params.sendUpdates, 'none')
+      throw new Error('response lost or duplicate ID')
+    }
+    assert.ok(options.url.endsWith('/events/' + item.googleUploadId))
+    return { data: saved }
+  })
+  const first = await google.upload(data, item)
+  const retry = await google.upload(data, item)
+  assert.equal(first.id, retry.id)
+  assert.equal(saved.summary, item.title)
+  assert.equal(saved.description, item.description)
+  assert.equal(saved.start.dateTime, item.start)
+  assert.equal(posts, 2)
+  data.google.canWrite = false
+  await assert.rejects(google.upload(data, item), /write access/)
+})
+
+test('sync reconciles an upload whose response was lost and preserves local metadata', async t => {
+  const data = profile()
+  const item = { id: 'local-id', source: 'local', googleUploadId: 'b'.repeat(32), category: 'social', isFlexible: true, consequence: 'low' }
+  data.events = [item]
+  t.mock.method(OAuth2Client.prototype, 'request', async () => ({ data: { items: [remote(item.googleUploadId, { extendedProperties: { private: { moodifyLocalEvent: item.id } } })] } }))
+  await google.sync(data)
+  assert.equal(data.events.length, 1)
+  assert.equal(data.events[0].id, item.id)
+  assert.equal(data.events[0].source, 'google')
+  assert.equal(data.events[0].category, 'social')
+  assert.equal(data.events[0].isFlexible, true)
+  await google.sync(data)
+  assert.equal(data.events.length, 1)
+})
+
+test('Google all-day time edits preserve date-only boundaries and ETag protection', async t => {
+  const data = profile()
+  let patch
+  t.mock.method(OAuth2Client.prototype, 'request', async options => {
+    if (options.method === 'PATCH') { patch = options; return { data: { etag: 'new' } } }
+    return { data: { items: [] } }
+  })
+  await google.move(data, { googleId: 'all-day', etag: 'old', allDay: true }, { start: '2026-09-10T16:00:00.000Z', end: '2026-09-11T16:00:00.000Z' })
+  assert.deepEqual(patch.data, { start: { date: '2026-09-11' }, end: { date: '2026-09-12' } })
+  assert.equal(patch.headers['If-Match'], 'old')
+})

@@ -71,6 +71,23 @@ export default function App() {
     }
   }, [])
 
+  useEffect(() => {
+    const viewport = window.visualViewport
+    const update = () => {
+      document.documentElement.style.setProperty('--visible-height', `${viewport?.height || window.innerHeight}px`)
+      document.documentElement.style.setProperty('--visible-top', `${viewport?.offsetTop || 0}px`)
+    }
+    update()
+    viewport?.addEventListener('resize', update)
+    viewport?.addEventListener('scroll', update)
+    window.addEventListener('resize', update)
+    return () => {
+      viewport?.removeEventListener('resize', update)
+      viewport?.removeEventListener('scroll', update)
+      window.removeEventListener('resize', update)
+    }
+  }, [])
+
   // Color helper for capacity pill
   const getCapacityBadge = () => {
     const score = capacity?.capacityScore ?? 0
@@ -82,7 +99,7 @@ export default function App() {
   return (
     <div className="pixel-ui relative h-screen w-screen overflow-hidden bg-[#0d0b12] text-[#fff8ef]" data-scene={activeScene}>
       {/* Floating Top Wellness Navigation Bar */}
-      <header className="pixel-hud pointer-events-none absolute inset-x-0 top-0 z-40 flex items-center justify-between p-3 sm:px-6">
+      {activeScene === 'main' && <header className="pixel-hud pointer-events-none absolute inset-x-0 top-0 z-40 flex items-center justify-between p-3 sm:px-6">
         {/* Brand & Room Title */}
         <div className="pixel-brand pointer-events-auto flex items-center gap-2 rounded-2xl border border-white/15 bg-black/50 px-4 py-2 backdrop-blur-md shadow-lg">
           <span className="text-xl"><PixelIcon symbol="🌿" /></span>
@@ -185,7 +202,7 @@ export default function App() {
           <span>Capacity:</span>
           <span>{capacity ? `${capacity.capacityScore}%` : '—'}</span>
         </button>
-      </header>
+      </header>}
 
       {/* Main PixiJS Game Room */}
       {activeScene === 'main' && (

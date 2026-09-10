@@ -28,7 +28,7 @@ const assetSources = {
   day: '/moodify/day.png',
   night: '/moodify/night.png',
   rain: '/moodify/raindrop.png',
-  settings: '/moodify/settings.png',
+  settings: '/moodify/pixel-settings.svg',
   tv: '/moodify/tv-interface.png',
   radio: '/moodify/radio-interface.png',
   plant: '/moodify/plant-interface.png',
@@ -148,7 +148,7 @@ export async function createMoodifyGame(canvasHost, callbacks = {}) {
   ICONS.filter((icon) => icon.layer === 'front').forEach(addIcon)
 
   const settings = new Sprite(textures.settings)
-  settings.position.set(VIRTUAL_WIDTH - 100, 20)
+  settings.position.set(VIRTUAL_WIDTH - 100, 80)
   settings.width = 80
   settings.height = 80
   clickable(settings, () => callbacks.onSettings?.(), 'Settings')

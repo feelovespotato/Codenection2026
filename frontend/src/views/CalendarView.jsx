@@ -19,18 +19,18 @@ function EventForm({ date, zone, event, onDone }) {
   async function save(e) {
     e.preventDefault(); setError('')
     const fields = Object.fromEntries(new FormData(e.currentTarget))
-    const body = { ...fields, isFlexible: fields.isFlexible === 'on' }
+    const body = { ...fields, isFlexible: fields.isFlexible === 'on', approved: remote }
     try { await run(event ? `/events/${event.id}` : '/events', body, event ? 'PATCH' : 'POST'); onDone() }
     catch (failure) { setError(failure.message) }
   }
   return <form onSubmit={save} className="space-y-4 rounded-2xl border border-amber-300 bg-amber-50/50 p-5 text-sm text-stone-800">
     <h3 className="font-bold">{event ? 'Edit event' : 'Add a commitment'}</h3>
-    {remote && <p className="text-xs">Edit classification and flexibility here. Time changes use the dashboard’s per-task approval; edit other details in Google Calendar.</p>}
+    {remote && <p className="text-xs">Saving changed dates or times updates this event in Google Calendar and requires write access. Classification and flexibility are saved in Moodify. Edit the title in Google Calendar.</p>}
     <label className="block font-semibold">Title<input name="title" required maxLength={250} defaultValue={event?.title || ''} readOnly={remote} className={inputClass} placeholder="e.g. Algorithm lecture or grocery run" /></label>
-    {!remote && <div className="grid gap-3 sm:grid-cols-2">
-      <label className="font-semibold">Start<input name="start" type="datetime-local" required defaultValue={event ? toLocal(event.start) : `${date}T09:00`} className={inputClass} /></label>
-      <label className="font-semibold">End<input name="end" type="datetime-local" required defaultValue={event ? toLocal(event.end) : `${date}T10:00`} className={inputClass} /></label>
-    </div>}
+    <div className="grid gap-3 sm:grid-cols-2">
+      <label className="font-semibold">Start<input name="start" type={event?.allDay ? 'date' : 'datetime-local'} required defaultValue={event ? (event.allDay ? localDate(event.start, zone) : toLocal(event.start)) : `${date}T09:00`} className={inputClass} /></label>
+      <label className="font-semibold">{event?.allDay ? 'End date (exclusive)' : 'End'}<input name="end" type={event?.allDay ? 'date' : 'datetime-local'} required defaultValue={event ? (event.allDay ? localDate(event.end, zone) : toLocal(event.end)) : `${date}T10:00`} className={inputClass} /></label>
+    </div>
     <p className="text-xs text-stone-600">Times use {zone}. Choose the next date for an overnight event.</p>
     <div className="grid gap-3 sm:grid-cols-2">
       <label className="font-semibold">Category<select name="category" defaultValue={event?.category || 'auto'} className={inputClass}><option value="auto">Auto classify from title</option><option value="cognitive">Cognitive</option><option value="social">Social</option><option value="recharge">Recharge</option></select></label>
@@ -40,7 +40,7 @@ function EventForm({ date, zone, event, onDone }) {
     <label className="flex items-center gap-2"><input name="isFlexible" type="checkbox" defaultChecked={event?.isFlexible || false} disabled={event?.hasAttendees} />Flexible task — allow rescheduling suggestions</label>
     {event?.hasAttendees && <p className="text-xs">Events with other attendees stay fixed.</p>}
     {error && <p role="alert" className="text-rose-700">{error}</p>}
-    <div className="flex gap-2"><button className={buttonClass} disabled={busy}>{busy ? 'Saving…' : 'Save event'}</button><button type="button" className={secondaryClass} onClick={onDone}>Cancel</button></div>
+    <div className="flex gap-2"><button className={buttonClass} disabled={busy}>{busy ? 'Saving…' : remote ? 'Save event / update Google times' : 'Save event'}</button><button type="button" className={secondaryClass} onClick={onDone}>Cancel</button></div>
   </form>
 }
 
@@ -94,6 +94,7 @@ export default function CalendarView() {
       <section className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
         <h3 className="font-bold text-stone-900">Bring your calendar into Moodify</h3>
         <p className="mt-1 text-sm text-stone-600">Events are classified automatically. Imported commitments stay fixed until you mark them flexible.</p>
+        <p className="mt-2 text-xs text-stone-600">Sync brings Google events here. To send a local event to your primary Google calendar, enable write access and choose Upload to Google on that event.</p>
         <div className="mt-4 flex flex-wrap items-center gap-2">
           {!data.google.connected ? <button className={buttonClass} disabled={busy || !data.google.configured} onClick={() => connect(false)}>Connect Google (read only)</button> : <>
             <button className={buttonClass} disabled={busy} onClick={() => action('/google/sync', {}, result => `Synced ${result.count} events from your primary Google calendar.`)}>Sync now</button>
@@ -131,7 +132,8 @@ export default function CalendarView() {
           <div className="mt-3 flex flex-wrap gap-2">
             <button className={secondaryClass} disabled={busy} onClick={() => { setEditing(event); setAdding(false) }}>Edit</button>
             {event.source !== 'google' && <button className={secondaryClass} disabled={busy} onClick={() => setPendingDelete(event.id)}>Delete</button>}
-            {event.category === 'recharge' && <span className="rounded-xl bg-emerald-50 px-4 py-2.5 text-xs font-semibold text-emerald-900">{event.allDay ? 'All-day recovery does not count toward streaks' : event.recoveryStatus === 'confirmed' ? 'Recovery confirmed · counted in streak' : event.recoveryStatus === 'inferred' ? 'Auto-counted · completion inferred from calendar' : 'Counts automatically when this block ends'}</span>}
+            {event.source === 'local' && <button className={buttonClass} disabled={busy || !data.google.canWrite} onClick={() => action(`/events/${event.id}/upload-google`, { approved: true }, 'Uploaded to your primary Google calendar. This event is now linked; Sync now will update it without adding another local copy.')}>Upload to Google</button>}
+            {event.category === 'recharge' && <span className="rounded-xl bg-emerald-50 px-4 py-2.5 text-xs font-semibold text-emerald-900">{event.allDay ? 'All-day recovery does not count toward streaks' : event.recoveryStatus === 'confirmed' ? 'Recovery confirmed · calendar streak' : event.recoveryStatus === 'inferred' ? 'Calendar streak only · completion inferred' : 'Counts toward calendar streak when this block ends'}</span>}
           </div>
           {pendingDelete === event.id && <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl bg-rose-50 p-3"><span>Delete this commitment from Moodify?</span><button className="rounded-lg bg-rose-700 px-3 py-2 font-semibold text-white" disabled={busy} onClick={async () => { const result = await action(`/events/${event.id}`, {}, 'Event deleted.', 'DELETE'); if (result) setPendingDelete(null) }}>Delete event</button><button className={secondaryClass} onClick={() => setPendingDelete(null)}>Keep event</button></div>}
         </article>)}

@@ -49,9 +49,9 @@ export default function MainGamePage({
   }, [onActivity, onFeature, onHotspot, onSettings])
 
   return (
-    <main className="fixed inset-0 flex h-svh w-screen items-center justify-center overflow-hidden bg-[#0d0b12]">
+    <main className="main-room fixed inset-0 flex h-svh w-screen items-center justify-center overflow-hidden bg-[#0d0b12]">
       <section
-        className="relative h-[min(100svh,56.25vw)] w-[min(100vw,177.7778svh)] overflow-hidden bg-[#0d0b12]"
+        className="main-room__stage relative h-[min(100svh,56.25vw)] w-[min(100vw,177.7778svh)] overflow-hidden bg-[#0d0b12]"
         aria-label="Moodify main game"
       >
         <div ref={hostRef} className="game-canvas absolute inset-0" />
@@ -69,7 +69,7 @@ export default function MainGamePage({
         )}
 
         {settingsOpen && (
-          <aside className="pixel-settings absolute right-3 top-[13%] w-52 border-4 border-[#3b2930] bg-[#fff0dc] p-3 text-[#251a20] shadow-2xl sm:w-64">
+          <aside className="pixel-settings absolute right-3 top-[13%] max-h-[80%] overflow-y-auto w-52 border-4 border-[#3b2930] bg-[#fff0dc] p-3 text-[#251a20] shadow-2xl sm:w-64">
             <div className="mb-2 flex items-center justify-between border-b-2 border-[#a87c66] pb-2">
               <h2 className="text-base font-black uppercase tracking-wider">Settings</h2>
               <button type="button" className="px-2 text-xl font-black" onClick={() => setSettingsOpen(false)} aria-label="Close settings">×</button>
@@ -116,6 +116,13 @@ export default function MainGamePage({
           </aside>
         )}
       </section>
+      <div className="main-room__mobile-tools">
+        <p>Swipe the room sideways to explore. Use the menu above to open your activities.</p>
+        <div>
+          <button type="button" onClick={() => onActivity?.('phone')}>Chat rooms</button>
+          <button type="button" onClick={() => setSettingsOpen(open => !open)}>Settings</button>
+        </div>
+      </div>
     </main>
   )
 }
