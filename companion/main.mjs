@@ -19,6 +19,7 @@ function createCompanionWindow() {
     alwaysOnTop: true,
     skipTaskbar: true,
     hasShadow: false,
+    focusable: false,
     webPreferences: {
       preload: fileURLToPath(new URL('./preload.cjs', import.meta.url)),
       contextIsolation: true,
@@ -29,6 +30,14 @@ function createCompanionWindow() {
   companionWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
   companionWindow.setIgnoreMouseEvents(true, { forward: true })
   companionWindow.on('closed', () => { companionWindow = null })
+
+  // Windows and macOS can silently clear the always-on-top flag the moment another
+  // window (e.g. the webpage's browser tab) becomes the foreground app. Re-assert it
+  // on a short interval so the companion never gets stuck behind whatever is active.
+  const keepOnTop = setInterval(() => {
+    if (!companionWindow || companionWindow.isDestroyed()) { clearInterval(keepOnTop); return }
+    if (!companionWindow.isAlwaysOnTop()) companionWindow.setAlwaysOnTop(true, 'screen-saver')
+  }, 1000)
 
   const load = async () => {
     try {
@@ -58,5 +67,11 @@ ipcMain.on('companion:drag-move', (_event, point) => {
 })
 ipcMain.on('companion:drag-end', () => { drag = null })
 
-app.whenReady().then(createCompanionWindow)
+app.whenReady().then(() => {
+  // Accessory apps don't show in the Dock/Cmd+Tab and aren't treated as a normal
+  // window-switching participant, which keeps the overlay from being pushed back
+  // during Space/full-screen switches on macOS.
+  if (process.platform === 'darwin') app.setActivationPolicy('accessory')
+  createCompanionWindow()
+})
 app.on('window-all-closed', () => app.quit())
