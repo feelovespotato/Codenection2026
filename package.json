@@ -2,13 +2,22 @@
   "name": "moodify",
   "private": true,
   "type": "module",
-  "workspaces": ["backend", "frontend"],
-  "engines": { "node": ">=24.0.0" },
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "engines": {
+    "node": ">=24.0.0"
+  },
   "scripts": {
     "dev": "node scripts/dev.mjs",
+    "companion": "electron companion/main.mjs",
     "start": "npm run start --workspace backend",
     "build": "npm run build --workspace frontend",
     "test": "npm run test --workspace backend",
     "lint": "npm run lint --workspace frontend"
+  },
+  "devDependencies": {
+    "electron": "^44.3.0"
   }
 }

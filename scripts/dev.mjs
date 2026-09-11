@@ -5,6 +5,9 @@ if (!npmCli) throw new Error('Start this script with npm run dev.')
 const children = ['backend', 'frontend'].map(workspace => spawn(process.execPath, [npmCli, 'run', 'dev'], {
   cwd: resolve(workspace), stdio: 'inherit', windowsHide: true,
 }))
+children.push(spawn(process.execPath, [npmCli, 'run', 'companion'], {
+  cwd: resolve('.'), stdio: 'inherit', windowsHide: true,
+}))
 let closing = false
 function stop(code = 0) {
   if (closing) return

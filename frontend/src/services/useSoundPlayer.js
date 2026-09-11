@@ -1,5 +1,6 @@
 import { useEffect, useState, useSyncExternalStore } from 'react'
 import { SoundPlayer } from './sound-player.js'
+import { readCompanionState, updateCompanionState } from './companion-state.js'
 
 export function useSoundPlayer(settings) {
   const [player] = useState(() => new SoundPlayer(settings))
@@ -19,5 +20,29 @@ export function useSoundPlayer(settings) {
     }
   }, [player])
   useEffect(() => { player.setSettings(settings) }, [player, settings])
+  useEffect(() => {
+    let alive = true
+    let publishing = false
+    const publish = async () => {
+      if (!alive || player.isApplyingCompanionState || publishing) return
+      publishing = true
+      const { activeTrackId, isPlaying, volume } = player.getSnapshot()
+      try { await updateCompanionState({ music: { activeTrackId, isPlaying, volume } }) } catch { /* The normal player still works if the local API is offline. */ }
+      finally { publishing = false }
+    }
+    const sync = async () => {
+      try {
+        const shared = await readCompanionState()
+        if (!alive || player.isApplyingCompanionState) return
+        const current = player.getSnapshot()
+        const music = shared.music
+        if (music && (music.activeTrackId !== current.activeTrackId || music.isPlaying !== current.isPlaying || music.volume !== current.volume)) await player.applyCompanionState(music)
+      } catch { /* Retry on the next polling interval. */ }
+    }
+    const unsubscribe = player.subscribe(publish)
+    sync()
+    const interval = window.setInterval(sync, 1000)
+    return () => { alive = false; unsubscribe(); window.clearInterval(interval) }
+  }, [player])
   return { ...state, selectTrack: player.selectTrack, togglePlay: player.togglePlay, setVolume: player.setVolume, handleSelectTimer: player.selectTimer }
 }

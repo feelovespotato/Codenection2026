@@ -21,10 +21,37 @@ export class SoundPlayer {
     this.listeners = new Set()
     this.generation = 0
     this.alive = false
+    this.isApplyingCompanionState = false
   }
   getSnapshot = () => this.state
   subscribe = listener => { this.listeners.add(listener); return () => this.listeners.delete(listener) }
   update(values) { this.state = { ...this.state, ...values }; for (const listener of this.listeners) listener() }
+  async applyCompanionState(next) {
+    const track = TRACKS.find(item => item.id === next.activeTrackId) || TRACKS[0]
+    const shouldPlay = next.isPlaying === true
+    const trackChanged = this.state.activeTrackId !== track.id
+    this.isApplyingCompanionState = true
+    try {
+      if (trackChanged) {
+        this.stopAmbient()
+        if (this.audio) { this.audio.onerror = null; this.audio.pause(); this.audio.src = '' }
+        this.audio = this.createAudio(track.file)
+        this.audio.loop = true
+        this.audio.volume = next.volume
+      }
+      if (this.audio) this.audio.volume = next.volume
+      if (shouldPlay && this.audio) {
+        try { await this.audio.play(); this.update({ activeTrackId: track.id, isPlaying: true, isStarting: false, volume: next.volume, error: '' }) }
+        catch { this.update({ activeTrackId: track.id, isPlaying: false, isStarting: false, volume: next.volume }) }
+      } else {
+        this.audio?.pause()
+        this.update({ activeTrackId: track.id, isPlaying: false, isStarting: false, volume: next.volume })
+        this.syncBackground()
+      }
+    } finally {
+      this.isApplyingCompanionState = false
+    }
+  }
   mount() {
     this.alive = true
     this.background = this.createAudio('/audio/calm_piano.mp3')
