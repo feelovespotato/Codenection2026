@@ -1,0 +1,5 @@
+{
+  "rewrites": [
+    { "source": "/api/:path*", "destination": "https://moodify-backend-navy.vercel.app/api/:path*" }
+  ]
+}

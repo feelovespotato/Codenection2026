@@ -1,20 +1,16 @@
-import { fileURLToPath } from 'node:url'
-import { resolve } from 'node:path'
-
 import { createStore, tokenCipher } from '../src/store.js'
 import { createGoogle } from '../src/google.js'
 import { createApp } from '../src/app.js'
 import { createAI } from '../src/ai.js'
 
-const root = fileURLToPath(new URL('../', import.meta.url))
+// Neon/Postgres
+const store = createStore(process.env.DATABASE_URL)
 
-// Vercel only allows temporary writable files in /tmp
-const directory = '/tmp/moodify'
-
-const store = createStore(resolve(directory, 'moodify.sqlite'))
+// Create required tables when the function starts
+await store.init()
 
 const cipher = tokenCipher(
-  directory,
+  null,
   process.env.TOKEN_ENCRYPTION_KEY
 )
 
@@ -41,6 +37,19 @@ const app = createApp({
   ai,
   origin,
   staticDirectory: null,
+})
+
+// Simple backend root check
+app.get('/', (_req, res) => {
+  res.json({
+    service: 'Moodify API',
+    health: '/api/health',
+  })
+})
+
+// Avoid favicon 500
+app.get('/favicon.ico', (_req, res) => {
+  res.status(204).end()
 })
 
 export default app

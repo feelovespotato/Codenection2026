@@ -2,6 +2,9 @@
   "name": "@moodify/backend",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": "24.x"
+  },
   "scripts": {
     "dev": "node --env-file-if-exists=.env --watch src/server.js",
     "start": "node --env-file-if-exists=.env src/server.js",
@@ -11,6 +14,7 @@
     "express": "^5.1.0",
     "google-auth-library": "^10.9.1",
     "luxon": "^3.7.0",
-    "node-ical": "^0.25.0"
+    "node-ical": "^0.25.0",
+    "pg": "^8.23.0"
   }
 }

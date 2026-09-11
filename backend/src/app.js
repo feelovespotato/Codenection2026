@@ -10,27 +10,37 @@ import { boundaryDraft, enhanceProposals } from './ai-features.js'
 export function createApp({ store, google, ai = createAI({ env: {} }), origin = 'http://localhost:5173', now = () => Date.now(), staticDirectory }) {
   const app = express()
   app.disable('x-powered-by')
-  app.use('/api', (req, res, next) => {
-    res.set('Cache-Control', 'no-store')
-    res.set('X-Content-Type-Options', 'nosniff')
-    if (req.headers.origin && req.headers.origin !== origin) return res.status(403).json({ error: 'Request origin is not allowed.' })
-    if (!['GET', 'HEAD'].includes(req.method) && (req.headers['x-moodify-client'] !== 'web' || !req.is('application/json'))) return res.status(403).json({ error: 'Use the Moodify application to make changes.' })
-    next()
-  })
-  app.use(express.json({ limit: '1mb' }))
-  app.get('/api/health', (_req, res) => res.json({ ok: true }))
-  app.use('/api', (req, res, next) => {
-    const sessionId = /(?:^|; )moodify_session=([a-f0-9]{64})(?:;|$)/.exec(req.headers.cookie || '')?.[1]
-    let userId = sessionId && store.session(sessionId)
+  app.use('/api', async (req, res, next) => {
+  try {
+    const sessionId =
+      /(?:^|; )moodify_session=([a-f0-9]{64})(?:;|$)/
+        .exec(req.headers.cookie || '')?.[1]
+
+    let userId = sessionId
+      ? await store.session(sessionId)
+      : null
+
     if (!userId) {
       userId = randomUUID()
       const session = randomBytes(32).toString('hex')
-      store.createSession(session, userId)
-      res.cookie('moodify_session', session, { httpOnly: true, sameSite: 'lax', secure: origin.startsWith('https:'), maxAge: 30 * 86400000, path: '/' })
+
+      await store.createSession(session, userId)
+
+      res.cookie('moodify_session', session, {
+        httpOnly: true,
+        sameSite: 'lax',
+        secure: origin.startsWith('https:'),
+        maxAge: 30 * 86400000,
+        path: '/',
+      })
     }
+
     req.userId = userId
     next()
-  })
+  } catch (error) {
+    next(error)
+  }
+})
   // Serialize mutations per user across async Google/import operations to prevent lost updates.
   const locks = new Map()
   function mutate(handler) {
@@ -40,11 +50,19 @@ export function createApp({ store, google, ai = createAI({ env: {} }), origin = 
       const current = new Promise(resolve => { release = resolve })
       locks.set(req.userId, current)
       await prior
-      try { await handler(req, res, store.get(req.userId)) } catch (error) { next(error) }
+      try {
+        if (store.withUser) {
+          let reply
+          let status = 200
+          const deferred = { status(code) { status = code; return deferred }, json(body) { reply = () => res.status(status).json(body) }, redirect(url) { reply = () => res.redirect(url) } }
+          await store.withUser(req.userId, async () => handler(req, deferred, await store.get(req.userId)))
+          reply?.()
+        } else await handler(req, res, await store.get(req.userId))
+      } catch (error) { next(error) }
       finally { release(); if (locks.get(req.userId) === current) locks.delete(req.userId) }
     }
   }
-  function persist(req, data) { data.revision++; data.proposals = []; store.save(req.userId, data) }
+  async function persist(req, data) { data.revision++; data.proposals = []; await store.save(req.userId, data) }
   function snapshot(data, date) {
     date ||= DateTime.fromMillis(now(), { zone: data.zone }).toISODate()
     return { zone: data.zone, date, serverTime: new Date(now()).toISOString(), events: data.events.map(event => ({ ...event, recoveryStatus: recoveryStatus(event, now()) })), checkin: data.checkins.find(c => c.date === date) || null,
@@ -54,16 +72,16 @@ export function createApp({ store, google, ai = createAI({ env: {} }), origin = 
       revision: data.revision, google: { configured: google.configured, connected: Boolean(data.google), canWrite: Boolean(data.google?.canWrite), lastSync: data.google?.lastSync || null },
     }
   }
-  app.get('/api/state', (req, res) => res.json(snapshot(store.get(req.userId), req.query.date)))
+  app.get('/api/state', async (req, res) => res.json(snapshot(await store.get(req.userId), req.query.date)))
   app.get('/api/ai/status', (_req, res) => res.json(ai.status()))
-  app.post('/api/recovery-sessions', mutate((req, res, data) => {
+  app.post('/api/recovery-sessions', mutate(async (req, res, data) => {
     requireValue(['balance', 'relax', 'calm', 'release'].includes(req.body.technique), 'Choose a breathing technique.')
     const session = { id: randomUUID(), technique: req.body.technique, startedAt: new Date(now()).toISOString(), durationSeconds: 60 }
     data.recoverySessions = [...(data.recoverySessions || []).filter(s => s.completedAt), session]
-    store.save(req.userId, data)
+    await store.save(req.userId, data)
     res.status(201).json({ session })
   }))
-  app.post('/api/recovery-sessions/:id/complete', mutate((req, res, data) => {
+  app.post('/api/recovery-sessions/:id/complete', mutate(async (req, res, data) => {
     const session = data.recoverySessions?.find(s => s.id === req.params.id)
     requireValue(session, 'Session not found. Start a new breathing session.', 404)
     if (!session.completedAt) {
@@ -71,20 +89,20 @@ export function createApp({ store, google, ai = createAI({ env: {} }), origin = 
       requireValue(elapsed >= session.durationSeconds * 1000, 'Finish the full session before completing it.', 409)
       requireValue(elapsed <= 30 * 60000, 'Session expired. Start a new breathing session.', 409)
       session.completedAt = new Date(now()).toISOString()
-      store.save(req.userId, data)
+      await store.save(req.userId, data)
     }
     res.json({ session })
   }))
-  app.post('/api/boundary-template', async (req, res) => res.json(await boundaryDraft(ai, req.body, store.get(req.userId), req.userId)))
-  app.put('/api/preferences', mutate((req, res, data) => {
+  app.post('/api/boundary-template', async (req, res) => res.json(await boundaryDraft(ai, req.body, await store.get(req.userId), req.userId)))
+  app.put('/api/preferences', mutate(async (req, res, data) => {
     requireValue(validZone(req.body.zone), 'Choose a valid IANA time zone.')
-    if (data.zone !== req.body.zone) { data.zone = req.body.zone; persist(req, data) }
+    if (data.zone !== req.body.zone) { data.zone = req.body.zone; await persist(req, data) }
     res.json(snapshot(data))
   }))
-  app.post('/api/events', mutate((req, res, data) => {
+  app.post('/api/events', mutate(async (req, res, data) => {
     const event = normalizeEvent(req.body, data.zone)
     requireValue(data.events.length < 12000, 'Calendar is full.', 413)
-    data.events.push(event); persist(req, data); res.status(201).json({ event })
+    data.events.push(event); await persist(req, data); res.status(201).json({ event })
   }))
   app.patch('/api/events/:id', mutate(async (req, res, data) => {
     const event = data.events.find(e => e.id === req.params.id)
@@ -98,7 +116,7 @@ export function createApp({ store, google, ai = createAI({ env: {} }), origin = 
       updated.etag = remote.etag
     }
     data.events = data.events.map(e => e.id === event.id ? updated : e)
-    persist(req, data); res.json({ event: updated })
+    await persist(req, data); res.json({ event: updated })
   }))
   app.post('/api/events/:id/upload-google', mutate(async (req, res, data) => {
     requireValue(req.body.approved === true, 'Approve uploading this event first.')
@@ -108,30 +126,30 @@ export function createApp({ store, google, ai = createAI({ env: {} }), origin = 
     requireValue(event.source === 'local', 'Only local events can be uploaded directly.')
     requireValue(data.google?.canWrite, 'Enable Google write access before uploading.', 409)
     // Save a stable identity before the network call so retries and sync can reconcile it.
-    event.googleUploadId ||= randomUUID().replaceAll('-', '')
-    store.save(req.userId, data)
+    event.googleUploadId ||= event.id.replaceAll('-', '')
+    await store.save(req.userId, data)
     const remote = await google.upload(data, event)
     Object.assign(event, { source: 'google', googleId: remote.id, etag: remote.etag })
-    persist(req, data)
+    await persist(req, data)
     res.json({ event })
   }))
-  app.delete('/api/events/:id', mutate((req, res, data) => {
+  app.delete('/api/events/:id', mutate(async (req, res, data) => {
     const event = data.events.find(e => e.id === req.params.id)
     requireValue(event, 'Event not found.', 404)
     requireValue(event.source !== 'google', 'Delete this event in Google Calendar, then sync again.')
-    data.events = data.events.filter(e => e.id !== event.id); persist(req, data); res.json({ ok: true })
+    data.events = data.events.filter(e => e.id !== event.id); await persist(req, data); res.json({ ok: true })
   }))
-  app.post('/api/events/:id/complete', mutate((req, res, data) => {
+  app.post('/api/events/:id/complete', mutate(async (req, res, data) => {
     const event = data.events.find(e => e.id === req.params.id)
     requireValue(event?.category === 'recharge', 'Recovery event not found.', 404)
     requireValue(Date.parse(event.end) <= now(), 'This recovery block has not finished yet.')
-    event.completedAt ||= new Date(now()).toISOString(); persist(req, data); res.json({ ok: true })
+    event.completedAt ||= new Date(now()).toISOString(); await persist(req, data); res.json({ ok: true })
   }))
-  app.post('/api/checkins', mutate((req, res, data) => {
+  app.post('/api/checkins', mutate(async (req, res, data) => {
     requireValue(Number.isInteger(req.body.score) && req.body.score >= 1 && req.body.score <= 5, 'Stress score must be an integer from 1 to 5.')
     const date = DateTime.fromMillis(now(), { zone: data.zone }).toISODate()
     data.checkins = [{ date, score: req.body.score, recordedAt: new Date(now()).toISOString() }, ...data.checkins.filter(c => c.date !== date)].slice(0, 366)
-    persist(req, data); res.json(snapshot(data))
+    await persist(req, data); res.json(snapshot(data))
   }))
   app.post('/api/calendar/import', mutate(async (req, res, data) => {
     const sourceName = String(req.body.name || 'calendar.ics').slice(0, 200)
@@ -140,10 +158,10 @@ export function createApp({ store, google, ai = createAI({ env: {} }), origin = 
     const incoming = result.events.map(event => old.has(event.id) ? { ...event, category: old.get(event.id).category, weight: old.get(event.id).weight, isFlexible: old.get(event.id).isFlexible, consequence: old.get(event.id).consequence, deadline: old.get(event.id).deadline, completedAt: old.get(event.id).completedAt } : event)
     data.events = [...data.events.filter(e => !(e.source === 'ics' && e.sourceName === sourceName && Date.parse(e.start) < Date.parse(result.to) && Date.parse(e.end) > Date.parse(result.from))), ...incoming]
     requireValue(data.events.length <= 12000, 'Import would exceed the calendar size limit.', 413)
-    persist(req, data); res.json({ count: incoming.length, from: result.from, to: result.to })
+    await persist(req, data); res.json({ count: incoming.length, from: result.from, to: result.to })
   }))
-  app.get('/api/calendar/export', (req, res) => {
-    const data = store.get(req.userId)
+  app.get('/api/calendar/export', async (req, res) => {
+    const data = await store.get(req.userId)
     res.set('Content-Disposition', 'attachment; filename="moodify-calendar.ics"').type('text/calendar').send(exportCalendar(data.events, data.zone))
   })
   app.post('/api/proposals', mutate(async (req, res, data) => {
@@ -156,7 +174,7 @@ export function createApp({ store, google, ai = createAI({ env: {} }), origin = 
     const suggestions = kind === 'shed' ? ranked.slice(0, 1) : ranked
     const proposals = suggestions.map(item => ({ ...item, id: randomUUID(), revision: data.revision, expires: now() + 15 * 60000 }))
     data.proposals = [...data.proposals.filter(p => p.expires > now() && p.kind !== kind), ...proposals].slice(-20)
-    store.save(req.userId, data)
+    await store.save(req.userId, data)
     res.json({ proposals, message: proposals.length ? null : kind === 'batch' ? 'No batch available. Choose at least two upcoming flexible errands of 45 minutes or less, with low/medium consequence and a free combined block.' : kind === 'recovery' ? 'No suitable free time remains between 08:00 and 21:00 on this day.' : 'No safe move found. Mark an upcoming task flexible with low/medium consequence, or keep this schedule.' })
   }))
   app.post('/api/proposals/:id/apply', mutate(async (req, res, data) => {
@@ -182,7 +200,7 @@ export function createApp({ store, google, ai = createAI({ env: {} }), origin = 
         data.revision++
         proposal.revision = data.revision
         data.proposals = proposal.moves.every(m => m.applied) ? [] : [proposal]
-        store.save(req.userId, data)
+        await store.save(req.userId, data)
         res.json({ ok: true, proposal, revision: data.revision }); return
       }
       const ids = new Set(proposal.moves.map(move => move.eventId))
@@ -196,7 +214,7 @@ export function createApp({ store, google, ai = createAI({ env: {} }), origin = 
       }
       // Validate all moves before updating any event. No remote writes or deletions.
       for (const move of proposal.moves) Object.assign(data.events.find(e => e.id === move.eventId), move.after)
-      persist(req, data); res.json({ ok: true }); return
+      await persist(req, data); res.json({ ok: true }); return
     }
     requireValue(!overlaps(proposal.after, data.events, proposal.eventId), 'That slot is no longer free. Generate new suggestions.', 409)
     if (proposal.kind === 'recovery') {
@@ -216,21 +234,21 @@ export function createApp({ store, google, ai = createAI({ env: {} }), origin = 
       }
       Object.assign(event, proposal.after)
     }
-    persist(req, data); res.json({ ok: true })
+    await persist(req, data); res.json({ ok: true })
   }))
-  app.post('/api/google/connect', mutate((req, res, data) => {
+  app.post('/api/google/connect', mutate(async (req, res, data) => {
     const state = randomBytes(32).toString('hex'), write = req.body.write === true
     const url = google.authUrl(state, write)
-    data.oauth = { state, write, expires: now() + 10 * 60000 }; store.save(req.userId, data)
+    data.oauth = { state, write, expires: now() + 10 * 60000 }; await store.save(req.userId, data)
     res.json({ url })
   }))
   app.get('/api/google/callback', mutate(async (req, res, data) => {
     const oauth = data.oauth
-    delete data.oauth; store.save(req.userId, data)
+    delete data.oauth; await store.save(req.userId, data)
     if (!oauth || oauth.state !== req.query.state || oauth.expires < now() || req.query.error || typeof req.query.code !== 'string') return res.redirect(`${origin}/?calendar=denied`)
     try {
       data.google = await google.exchange(req.query.code, oauth.write)
-      persist(req, data)
+      await persist(req, data)
       res.redirect(`${origin}/?calendar=connected`)
     } catch (error) {
       const allowed = ['invalid_client', 'invalid_grant', 'redirect_uri_mismatch', 'access_denied', 'unauthorized_client', 'provider_unavailable', 'network_error', 'exchange_failed', 'token_storage_failed']
@@ -238,11 +256,11 @@ export function createApp({ store, google, ai = createAI({ env: {} }), origin = 
       res.redirect(`${origin}/?calendar=failed&reason=${reason}`)
     }
   }))
-  app.post('/api/google/sync', mutate(async (req, res, data) => { const count = await google.sync(data, now()); persist(req, data); res.json({ count }) }))
-  app.post('/api/google/disconnect', mutate((req, res, data) => {
+  app.post('/api/google/sync', mutate(async (req, res, data) => { const count = await google.sync(data, now()); await persist(req, data); res.json({ count }) }))
+  app.post('/api/google/disconnect', mutate(async (req, res, data) => {
     data.google = null; delete data.oauth
     data.events = data.events.filter(e => e.source !== 'google')
-    persist(req, data); res.json({ ok: true })
+    await persist(req, data); res.json({ ok: true })
   }))
   app.use('/api', (_req, res) => res.status(404).json({ error: 'API endpoint not found.' }))
   if (staticDirectory) app.use(express.static(staticDirectory))
