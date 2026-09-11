@@ -10,6 +10,7 @@ import { boundaryDraft, enhanceProposals } from './ai-features.js'
 export function createApp({ store, google, ai = createAI({ env: {} }), origin = 'http://localhost:5173', now = () => Date.now(), staticDirectory }) {
   const app = express()
   app.disable('x-powered-by')
+  app.use(express.json())
   app.use('/api', async (req, res, next) => {
   try {
     const sessionId =
