@@ -25,25 +25,40 @@
 .pixel-ui :is(button, input, textarea, select, a) { -webkit-tap-highlight-color: transparent; }
 .pixel-ui :is(button, a, input, textarea, select):focus-visible { outline: 3px solid #a45826 !important; outline-offset: 3px; }
 
-/* The HUD is an inventory strip, with a compact second row on small screens. */
-.pixel-ui .pixel-hud { gap: 12px; padding: 12px 20px; align-items: start; }
-.pixel-ui .pixel-brand, .pixel-ui .pixel-nav, .pixel-ui .pixel-capacity {
+/* The HUD is a single-line inventory strip pinned to the top; it never wraps into a
+   second row — the nav scrolls sideways instead, so it can't drift over game icons below it.
+   --pixel-hud-height tracks its real height so the game stage can pad itself clear of it. */
+.pixel-ui { --pixel-hud-height: 78px; }
+.pixel-ui .pixel-hud { gap: 12px; padding: 12px 20px; align-items: center; flex-wrap: nowrap; }
+.pixel-ui .pixel-brand, .pixel-ui .pixel-nav, .pixel-ui .pixel-capacity, .pixel-ui .pixel-nav-toggle {
   border: 3px solid var(--pixel-ink); border-radius: 0; background: var(--pixel-cream);
   color: var(--pixel-ink); box-shadow: inset 2px 2px 0 #fff9e8, inset -2px -2px 0 #b38e6e, 4px 4px 0 var(--pixel-ink);
   backdrop-filter: none; -webkit-backdrop-filter: none;
 }
+.pixel-ui .pixel-nav-toggle {
+  font-family: var(--pixel-font); font-size: 18px; font-weight: 700; min-height: 54px; min-width: 44px;
+  padding: 5px 10px; background: #f9eace; transition: transform 80ms steps(2, end), background-color 80ms steps(1, end);
+}
+.pixel-ui .pixel-nav-toggle:hover { background: var(--pixel-peach); transform: translateY(-1px); }
+.pixel-ui .pixel-nav-toggle:active { transform: translate(1px, 2px); box-shadow: 4px 4px 0 var(--pixel-ink); }
 .pixel-ui .pixel-brand { min-height: 54px; padding: 7px 12px; }
 .pixel-brand h1 { font-family: var(--pixel-font); font-size: 20px; line-height: 1; color: var(--pixel-ink); letter-spacing: .03em; }
 .pixel-brand p { color: var(--pixel-muted); font-size: 10px; margin-top: 3px; }
-.pixel-ui .pixel-nav { padding: 5px; gap: 4px; max-width: none; overflow: visible; min-width: 0; }
+.pixel-ui .pixel-nav {
+  padding: 5px; gap: 6px; max-width: none; min-width: 0; min-height: 54px;
+  flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch; background: transparent; border-color: transparent;
+  box-shadow: none;
+}
 .pixel-ui .pixel-nav button {
   font-family: var(--pixel-font); font-size: 16px; font-weight: 600; line-height: 1.2;
-  min-height: 38px; padding: 5px 9px; gap: 7px; white-space: nowrap; border: 2px solid transparent;
-  border-radius: 0; background: #f9eace; color: var(--pixel-ink); box-shadow: none;
+  min-height: 44px; padding: 6px 10px; gap: 7px; white-space: nowrap;
+  border: 3px solid var(--pixel-ink); border-radius: 0; background: #f9eace; color: var(--pixel-ink);
+  box-shadow: inset 1px 1px 0 #fff9e8, inset -1px -1px 0 #b38e6e, 3px 3px 0 var(--pixel-ink);
   transition: transform 80ms steps(2, end), background-color 80ms steps(1, end);
 }
 .pixel-ui .pixel-nav button:hover, .pixel-ui .pixel-nav button[aria-current="page"] {
-  background: var(--pixel-peach); border-color: var(--pixel-ink); box-shadow: 2px 2px 0 var(--pixel-ink); transform: translateY(-1px);
+  background: var(--pixel-peach); box-shadow: inset 1px 1px 0 #fff9e8, inset -1px -1px 0 #b38e6e, 4px 4px 0 var(--pixel-ink); transform: translate(-1px, -1px);
 }
 .pixel-ui .pixel-nav button:active { transform: translate(1px, 2px); box-shadow: none; }
 .pixel-ui .pixel-capacity { font-family: var(--pixel-font); font-size: 17px; min-height: 54px; padding: 8px 12px; white-space: nowrap; }
@@ -163,13 +178,17 @@
   .pixel-ui .pixel-nav button { padding: 5px 7px; font-size: 15px; gap: 5px; }
 }
 @media (max-width: 767px) {
-  .pixel-ui .pixel-hud { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 8px; padding: 8px 10px; }
-  .pixel-ui .pixel-brand { grid-column: 1; min-height: 40px; padding: 5px 9px; }
-  .pixel-ui .pixel-capacity { grid-column: 3; grid-row: 1; min-height: 40px; font-size: 15px; padding: 5px 9px; }
-  .pixel-ui .pixel-nav { grid-column: 1 / -1; grid-row: 2; display: grid; grid-template-columns: repeat(7,minmax(0,1fr)); gap: 3px; padding: 4px; }
-  .pixel-ui .pixel-nav button { flex-direction: column; padding: 5px 1px; gap: 3px; min-height: 48px; font-size: 11px; }
-  .pixel-ui .pixel-nav button > span:last-child { display: inline; }
+  /* Stays one row: brand + capacity keep their size, the nav shrinks to icon-only
+     buttons and scrolls sideways for any items that don't fit. */
+  .pixel-ui { --pixel-hud-height: 56px; }
+  .pixel-ui .pixel-hud { gap: 6px; padding: 8px 10px; }
+  .pixel-ui .pixel-brand { min-height: 40px; padding: 5px 9px; }
+  .pixel-ui .pixel-capacity { min-height: 40px; font-size: 15px; padding: 5px 9px; }
+  .pixel-ui .pixel-nav { min-height: 40px; padding: 4px; gap: 4px; justify-content: flex-start; }
+  .pixel-ui .pixel-nav button { padding: 6px; min-height: 36px; min-width: 36px; font-size: 11px; border-width: 2px; box-shadow: 2px 2px 0 var(--pixel-ink); }
+  .pixel-ui .pixel-nav button > span:last-child { display: none; }
   .pixel-ui .pixel-nav .pixel-icon { width: 18px; height: 18px; }
+  .pixel-ui .pixel-nav-toggle { min-height: 40px; min-width: 40px; font-size: 16px; padding: 4px 8px; }
   .pixel-ui .pixel-modal { padding: 10px; }
   .pixel-ui .pixel-window { max-height: calc(100svh - 32px); border-width: 3px; }
   .pixel-window-header h2 { font-size: 21px; }
@@ -188,13 +207,11 @@
   .pixel-window-body .flex:has(> button[title="Toggle ambient breathing sound"]) { flex-wrap: wrap; justify-content: center; }
   .pixel-window-body .flex:has(> span:first-child):has(> button[aria-pressed]) { flex-wrap: wrap; justify-content: center; }
 }
-@media (min-width: 768px) and (max-width: 1023px) {
-  .pixel-ui .pixel-hud { flex-wrap: wrap; }
-  .pixel-ui .pixel-nav { order: 3; width: 100%; justify-content: space-between; }
-}
 @media (max-width: 420px) {
-  .pixel-ui .pixel-nav { grid-template-columns: repeat(4,minmax(0,1fr)); }
-  .pixel-ui .pixel-nav button { flex-direction: row; font-size: 12px; gap: 4px; }
+  .pixel-ui .pixel-brand p, .pixel-ui .pixel-brand > div { display: none; }
+  .pixel-ui .pixel-brand { padding: 5px 8px; gap: 0; }
+  .pixel-ui .pixel-capacity span:first-child { display: none; }
+  .pixel-ui .pixel-nav button { padding: 6px 5px; min-width: 32px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .pixel-ui *, .pixel-ui *::before, .pixel-ui *::after { animation: none !important; transition: none !important; }
@@ -208,7 +225,7 @@
 @media (max-width: 767px) {
   .pixel-ui .pixel-hud { padding-top: max(8px, env(safe-area-inset-top)); }
   .pixel-ui .main-room {
-    height: var(--visible-height, 100dvh); padding: 182px 0 max(12px, env(safe-area-inset-bottom));
+    height: var(--visible-height, 100dvh); padding: calc(var(--pixel-hud-height, 56px) + max(8px, env(safe-area-inset-top)) + 12px) 0 max(12px, env(safe-area-inset-bottom));
     display: flex; flex-direction: column; justify-content: flex-start; gap: 18px;
     overflow-y: auto; background: #42645e;
   }

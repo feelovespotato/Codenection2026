@@ -96,16 +96,16 @@ export default function App() {
     return 'bg-emerald-500/90 text-white border-emerald-400'
   }
 
-  const [isNavMinimized, setIsNavMinimized] = useState(false)
+  const [isNavHidden, setIsNavHidden] = useState(false)
 
   return (
     <div className="pixel-ui relative h-screen w-screen overflow-hidden bg-[#0d0b12] text-[#fff8ef]" data-scene={activeScene}>
-      {/* Floating Top Wellness Navigation Bar */}
+      {/* Floating Top Wellness Navigation Bar — single-line strip pinned to the very top */}
       {activeScene === 'main' && (
         <>
-          <header className="pixel-hud pointer-events-none absolute inset-x-0 top-0 z-40 flex items-start justify-between p-3 sm:px-6">
+          <header className="pixel-hud pointer-events-none absolute inset-x-0 top-0 z-40 flex items-center gap-2 p-2 sm:gap-3 sm:p-3 sm:px-6">
             {/* Brand & Room Title */}
-            <div className="pixel-brand pointer-events-auto flex items-center gap-2 rounded-2xl border border-white/15 bg-black/50 px-4 py-2 backdrop-blur-md shadow-lg">
+            <div className="pixel-brand pointer-events-auto flex shrink-0 items-center gap-2 rounded-2xl border border-white/15 bg-black/50 px-4 py-2 backdrop-blur-md shadow-lg">
               <span className="text-xl"><PixelIcon symbol="🌿" /></span>
               <div className="hidden sm:block">
                 <h1 className="text-xs font-black uppercase tracking-wider text-amber-100">Moodify</h1>
@@ -113,119 +113,114 @@ export default function App() {
               </div>
             </div>
 
-            {/* Right Side Container (Capacity + Vertical Nav) */}
-            <div className="flex flex-col items-end gap-3 pointer-events-auto">
-              {/* Capacity Indicator Pill */}
+            {/* Hide/show toggle for the Quick Hub row */}
+            <button
+              type="button"
+              onClick={() => setIsNavHidden((hidden) => !hidden)}
+              className="pixel-nav-toggle pointer-events-auto flex shrink-0 items-center justify-center"
+              title={isNavHidden ? 'Show navigation' : 'Hide navigation'}
+              aria-expanded={!isNavHidden}
+              aria-label={isNavHidden ? 'Show navigation' : 'Hide navigation'}
+            >
+              <span>{isNavHidden ? '☰' : '✕'}</span>
+            </button>
+
+            {/* Quick Hub Buttons — one horizontal row, centered, scrolls sideways instead of wrapping */}
+            {!isNavHidden && (
+            <nav
+              aria-label="Moodify Quick Hub"
+              className="pixel-nav pointer-events-auto flex min-w-0 flex-1 items-center justify-center gap-1.5 overflow-x-auto"
+            >
               <button
                 type="button"
-                onClick={() => setActiveModal('dashboard')}
-                className={`pixel-capacity flex items-center gap-2 rounded-2xl border px-3.5 py-1.5 text-xs font-black shadow-lg backdrop-blur-md transition hover:scale-105 active:scale-95 ${getCapacityBadge()}`}
-                title="Click to view Capacity Gauge & Load Shedder"
+                onClick={() => setActiveModal('diary')}
+                aria-current={activeModal === 'diary' ? 'page' : undefined}
+                className="flex shrink-0 items-center justify-center gap-2"
+                title="Diary"
               >
-                <span>Capacity:</span>
-                <span>{capacity ? `${capacity.capacityScore}%` : '—'}</span>
+                <span><PixelIcon symbol="📖" /></span>
+                <span className="hidden md:inline">Diary</span>
               </button>
 
-              {/* Vertical Quick Hub Buttons */}
-              <div className="flex flex-col items-end gap-2">
-                <nav
-                  aria-label="Moodify Quick Hub Toggle"
-                  className="pixel-nav flex flex-col items-end"
-                >
-                  <button
-                    type="button"
-                    onClick={() => setIsNavMinimized(!isNavMinimized)}
-                    className="flex w-full items-center justify-end gap-2"
-                  >
-                    <span>{isNavMinimized ? '☰ Menu' : '✕ Close'}</span>
-                  </button>
-                </nav>
-                
-                {!isNavMinimized && (
-                  <nav
-                    aria-label="Moodify Quick Hub"
-                    className="pixel-nav flex flex-col items-end"
-                  >
-                    <button
-                      type="button"
-                      onClick={() => setActiveModal('diary')}
-                      aria-current={activeModal === 'diary' ? 'page' : undefined}
-                      className="flex w-full items-center justify-end gap-2"
-                      title="Diary"
-                    >
-                      <span className="hidden md:inline">Diary</span>
-                      <span><PixelIcon symbol="📖" /></span>
-                    </button>
+              <button
+                type="button"
+                onClick={() => setActiveModal('mood')}
+                aria-current={activeModal === 'mood' ? 'page' : undefined}
+                className="flex shrink-0 items-center justify-center gap-2"
+                title="Mood Tracker"
+              >
+                <span><PixelIcon symbol="😄" /></span>
+                <span className="hidden md:inline">Mood</span>
+              </button>
 
-                    <button
-                      type="button"
-                      onClick={() => setActiveModal('mood')}
-                      aria-current={activeModal === 'mood' ? 'page' : undefined}
-                      className="flex w-full items-center justify-end gap-2"
-                      title="Mood Tracker"
-                    >
-                      <span className="hidden md:inline">Mood</span>
-                      <span><PixelIcon symbol="😄" /></span>
-                    </button>
+              <button
+                type="button"
+                onClick={() => setActiveModal('calendar')}
+                aria-current={activeModal === 'calendar' ? 'page' : undefined}
+                className="flex shrink-0 items-center justify-center gap-2"
+                title="Calendar"
+              >
+                <span><PixelIcon symbol="📅" /></span>
+                <span className="hidden md:inline">Calendar</span>
+              </button>
 
-                    <button
-                      type="button"
-                      onClick={() => setActiveModal('calendar')}
-                      aria-current={activeModal === 'calendar' ? 'page' : undefined}
-                      className="flex w-full items-center justify-end gap-2"
-                      title="Calendar"
-                    >
-                      <span className="hidden md:inline">Calendar</span>
-                      <span><PixelIcon symbol="📅" /></span>
-                    </button>
+              <button
+                type="button"
+                onClick={() => setActiveModal('breathing')}
+                aria-current={activeModal === 'breathing' ? 'page' : undefined}
+                className="flex shrink-0 items-center justify-center gap-2"
+                title="Breathing"
+              >
+                <span><PixelIcon symbol="⏳" /></span>
+                <span className="hidden md:inline">Breathe</span>
+              </button>
 
-                    <button
-                      type="button"
-                      onClick={() => setActiveModal('breathing')}
-                      aria-current={activeModal === 'breathing' ? 'page' : undefined}
-                      className="flex w-full items-center justify-end gap-2"
-                      title="Breathing"
-                    >
-                      <span className="hidden md:inline">Breathe</span>
-                      <span><PixelIcon symbol="⏳" /></span>
-                    </button>
+              <button
+                type="button"
+                onClick={() => setActiveModal('stress')}
+                aria-current={activeModal === 'stress' ? 'page' : undefined}
+                className="flex shrink-0 items-center justify-center gap-2"
+                title="Stress Check-In"
+              >
+                <span><PixelIcon symbol="📱" /></span>
+                <span className="hidden md:inline">Check-In</span>
+              </button>
 
-                    <button
-                      type="button"
-                      onClick={() => setActiveModal('stress')}
-                      aria-current={activeModal === 'stress' ? 'page' : undefined}
-                      className="flex w-full items-center justify-end gap-2"
-                      title="Stress Check-In"
-                    >
-                      <span className="hidden md:inline">Check-In</span>
-                      <span><PixelIcon symbol="📱" /></span>
-                    </button>
+              <button
+                type="button"
+                onClick={() => setActiveModal('sound')}
+                aria-current={activeModal === 'sound' ? 'page' : undefined}
+                className="flex shrink-0 items-center justify-center gap-2"
+                title="Ambient Audio"
+              >
+                <span><PixelIcon symbol="📻" /></span>
+                <span className="hidden md:inline">Sound</span>
+              </button>
 
-                    <button
-                      type="button"
-                      onClick={() => setActiveModal('sound')}
-                      aria-current={activeModal === 'sound' ? 'page' : undefined}
-                      className="flex w-full items-center justify-end gap-2"
-                      title="Ambient Audio"
-                    >
-                      <span className="hidden md:inline">Sound</span>
-                      <span><PixelIcon symbol="📻" /></span>
-                    </button>
+              <button
+                type="button"
+                onClick={() => setActiveModal('instructions')}
+                aria-current={activeModal === 'instructions' ? 'page' : undefined}
+                className="flex shrink-0 items-center justify-center gap-2"
+                title="Guide"
+              >
+                <span><PixelIcon symbol="❓" /></span>
+                <span className="hidden md:inline">Guide</span>
+              </button>
+            </nav>
+            )}
+            {isNavHidden && <div className="flex-1" />}
 
-                    <button
-                      type="button"
-                      onClick={() => setActiveModal('instructions')}
-                      aria-current={activeModal === 'instructions' ? 'page' : undefined}
-                      className="flex w-full items-center justify-end gap-2"
-                      title="Guide"
-                    >
-                      <span className="hidden md:inline">Guide</span>
-                      <span><PixelIcon symbol="❓" /></span>
-                    </button>
-                  </nav>
-                )}
-              </div>
-            </div>
+            {/* Capacity Indicator Pill */}
+            <button
+              type="button"
+              onClick={() => setActiveModal('dashboard')}
+              className={`pixel-capacity pointer-events-auto flex shrink-0 items-center gap-2 rounded-2xl border px-3.5 py-1.5 text-xs font-black shadow-lg backdrop-blur-md transition hover:scale-105 active:scale-95 ${getCapacityBadge()}`}
+              title="Click to view Capacity Gauge & Load Shedder"
+            >
+              <span>Capacity:</span>
+              <span>{capacity ? `${capacity.capacityScore}%` : '—'}</span>
+            </button>
           </header>
         </>
       )}
