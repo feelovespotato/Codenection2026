@@ -9,6 +9,20 @@ import { boundaryDraft, enhanceProposals } from './ai-features.js'
 
 export function createApp({ store, google, ai = createAI({ env: {} }), origin = 'http://localhost:5173', now = () => Date.now(), staticDirectory }) {
   const app = express()
+  // The Electron companion and the web app are separate renderers, so this
+  // small local server state is their shared source of truth for music/timer UI.
+  const companion = {
+    music: { activeTrackId: 'rain', isPlaying: false, volume: 0.7 },
+    focus: { isRunning: false, remainingSeconds: 25 * 60, endsAt: null },
+  }
+  const tracks = new Set(['rain', 'forest', 'calm_piano', 'bird', 'ocean', 'waterfall', 'keyboard', 'lofi_music'])
+  function companionSnapshot() {
+    if (companion.focus.isRunning && companion.focus.endsAt) {
+      companion.focus.remainingSeconds = Math.max(0, Math.ceil((companion.focus.endsAt - now()) / 1000))
+      if (companion.focus.remainingSeconds === 0) { companion.focus.isRunning = false; companion.focus.endsAt = null }
+    }
+    return { music: { ...companion.music }, focus: { isRunning: companion.focus.isRunning, remainingSeconds: companion.focus.remainingSeconds } }
+  }
   app.disable('x-powered-by')
   app.use('/api', (req, res, next) => {
     res.set('Cache-Control', 'no-store')
@@ -54,6 +68,34 @@ export function createApp({ store, google, ai = createAI({ env: {} }), origin = 
       revision: data.revision, google: { configured: google.configured, connected: Boolean(data.google), canWrite: Boolean(data.google?.canWrite), lastSync: data.google?.lastSync || null },
     }
   }
+  app.get('/api/companion-state', (_req, res) => res.json(companionSnapshot()))
+  app.patch('/api/companion-state', (req, res) => {
+    const music = req.body.music
+    if (music) {
+      if (music.activeTrackId !== undefined && tracks.has(music.activeTrackId)) companion.music.activeTrackId = music.activeTrackId
+      if (music.isPlaying !== undefined && typeof music.isPlaying === 'boolean') companion.music.isPlaying = music.isPlaying
+      if (music.volume !== undefined && Number.isFinite(music.volume)) companion.music.volume = Math.min(1, Math.max(0, music.volume))
+    }
+    const focus = req.body.focus
+    if (focus) {
+      if (Number.isInteger(focus.durationSeconds) && focus.durationSeconds >= 60 && focus.durationSeconds <= 4 * 3600) {
+        companion.focus.remainingSeconds = focus.durationSeconds
+        companion.focus.endsAt = null
+        companion.focus.isRunning = false
+      }
+      if (focus.action === 'start') {
+        companion.focus.isRunning = true
+        companion.focus.endsAt = now() + companion.focus.remainingSeconds * 1000
+      } else if (focus.action === 'pause') {
+        companionSnapshot()
+        companion.focus.isRunning = false
+        companion.focus.endsAt = null
+      } else if (focus.action === 'reset') {
+        companion.focus = { isRunning: false, remainingSeconds: 25 * 60, endsAt: null }
+      }
+    }
+    res.json(companionSnapshot())
+  })
   app.get('/api/state', (req, res) => res.json(snapshot(store.get(req.userId), req.query.date)))
   app.get('/api/ai/status', (_req, res) => res.json(ai.status()))
   app.post('/api/recovery-sessions', mutate((req, res, data) => {

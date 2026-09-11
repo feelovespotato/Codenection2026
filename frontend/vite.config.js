@@ -1,6 +1,7 @@
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { defineConfig } from 'vite'
+import { fileURLToPath } from 'node:url'
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
@@ -19,5 +20,13 @@ export default defineConfig({
     // A full page reload keeps Vite from retaining an older optimized React
     // runtime when dependency hashes change during local development.
     hmr: false,
+  },
+  build: {
+    rollupOptions: {
+      input: {
+        main: fileURLToPath(new URL('./index.html', import.meta.url)),
+        companion: fileURLToPath(new URL('./companion.html', import.meta.url)),
+      },
+    },
   },
 })
