@@ -1,4 +1,4 @@
-import { fileURLToPath } from 'node:url'
+ import { fileURLToPath } from 'node:url'
 import { resolve } from 'node:path'
 import { createStore, tokenCipher } from './store.js'
 import { createGoogle } from './google.js'
