@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { useMoodify } from '../services/moodify-context.js'
 import { api } from '../services/api.js'
 import { displaySlot } from '../services/dates.js'
-import { createSnapshotFile, downloadSnapshot } from '../services/snapshot.js'
 
 const button = 'rounded-xl bg-amber-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-amber-800 disabled:opacity-50'
 const secondary = 'rounded-xl border border-stone-300 px-4 py-2.5 text-sm font-semibold text-stone-800 disabled:opacity-50'
@@ -97,37 +96,6 @@ function TaskBatching() {
   </section>
 }
 
-function SnapshotShare() {
-  const { data } = useMoodify()
-  const [pending, setPending] = useState(false)
-  const [notice, setNotice] = useState('')
-  const [error, setError] = useState('')
-  async function exportCard(share) {
-    setPending(true); setError(''); setNotice('')
-    try {
-      const file = await createSnapshotFile(data)
-      if (share && navigator.canShare?.({ files: [file] })) {
-        await navigator.share({ files: [file], title: 'My Moodify capacity' })
-        setNotice('Share dialog completed.')
-      } else {
-        downloadSnapshot(file)
-        setNotice(share ? 'File sharing is unavailable here. Your PNG card was downloaded instead.' : 'PNG card downloaded.')
-      }
-    } catch (failure) { if (failure.name !== 'AbortError') setError('Could not create or share the card. Try downloading it again.') }
-    finally { setPending(false) }
-  }
-  return <section className={card}>
-    <h3 className="font-bold text-stone-900">Load Snapshot Share</h3>
-    <div className="mt-4 border-2 border-amber-800 bg-amber-50 p-5 text-center text-stone-900">
-      <p className="text-sm font-bold">MY MOODIFY</p><p className="mt-2 text-4xl font-black">{data.capacity.capacityScore}%</p><p className="text-sm">Daily capacity used</p><p className="mt-2 text-xs">{data.date} · {data.zone}</p>
-    </div>
-    <p className="mt-3 text-xs text-stone-600">The card includes only capacity, date and time zone. Event titles, diary entries and your check-in are left out.</p>
-    <div className="mt-4 flex flex-wrap gap-3"><button type="button" className={button} disabled={pending} onClick={() => exportCard(false)}>Download PNG</button><button type="button" className={secondary} disabled={pending} onClick={() => exportCard(true)}>Share card</button></div>
-    {notice && <p role="status" className="mt-3 text-sm text-emerald-800">{notice}</p>}
-    {error && <p role="alert" className="mt-3 text-sm text-rose-700">{error}</p>}
-  </section>
-}
-
 export default function TierTwoPanel() {
   const { data } = useMoodify()
   const sleep = data.insights?.sleep
@@ -147,6 +115,5 @@ export default function TierTwoPanel() {
     </section>
     <BoundaryGuard />
     <TaskBatching />
-    <SnapshotShare />
   </div>
 }

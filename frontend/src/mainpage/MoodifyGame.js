@@ -32,10 +32,9 @@ const assetSources = {
   rain: '/moodify/raindrop.png',
   settings: '/moodify/pixel-settings.svg',
   tv: '/moodify/tv-interface.png',
-  radio: '/moodify/radio-interface.png',
+  
   plant: '/moodify/plant-interface.png',
   cancel: '/moodify/cancel.png',
-  play: '/moodify/play.png',
   waterButton: '/moodify/water-button.png',
   wateringPot: '/moodify/watering-pot.png',
   waterDrops: '/moodify/water-drops.png',
@@ -202,58 +201,88 @@ export async function createMoodifyGame(canvasHost, callbacks = {}) {
     activeOverlay = null
   }
   const openOverlay = (type) => {
-    stopWatering()
-    overlay.removeChildren()
-    const background = new Sprite(textures[type])
-    background.width = VIRTUAL_WIDTH
-    background.height = VIRTUAL_HEIGHT
-    background.eventMode = 'static'
-    overlay.addChild(background)
+  stopWatering()
+  overlay.removeChildren()
+
+  const background = new Sprite(textures[type])
+  background.width = VIRTUAL_WIDTH
+  background.height = VIRTUAL_HEIGHT
+  background.eventMode = 'static'
+  overlay.addChild(background)
+
+  // TV and Plant only
+  if (type === 'tv' || type === 'plant') {
     const cancel = new Sprite(textures.cancel)
-    cancel.position.set(type === 'radio' ? 1000 : type === 'tv' ? 1045 : 1100, type === 'radio' ? 130 : type === 'tv' ? 80 : 40)
+
+    cancel.position.set(
+      type === 'tv' ? 1045 : 1100,
+      type === 'tv' ? 80 : 40
+    )
+
     clickable(cancel, closeOverlay, 'Close')
     overlay.addChild(cancel)
-    if (type === 'radio') {
-      const play = new Sprite(textures.play)
-      play.position.set(550, 400)
-      clickable(play, () => callbacks.onFeature?.('radio-play'), 'Play')
-      overlay.addChild(play)
-    }
-    if (type === 'plant') {
-      const water = new Sprite(textures.waterButton)
-      water.position.set(60, 50)
-      clickable(water, () => {
-        callbacks.onFeature?.('plant-water')
-        stopWatering()
-        const pot = new Sprite(textures.wateringPot)
-        pot.position.set(710, 150)
-        const drops = new Sprite(textures.waterDrops)
-        drops.position.set(630, 350)
-        overlay.addChild(pot, drops)
-        wateringAnimation = { pot, drops, elapsed: 0 }
-      }, 'Water plant')
-      overlay.addChild(water)
-    }
-    activeOverlay = type
-    overlay.visible = true
   }
 
-  const zones = [
-    { type: 'tv', x: 251, y: 275, width: 230, height: 150 },
-    { type: 'radio', x: 800, y: 480, width: 130, height: 80 },
-    { type: 'plant', x: 500, y: 290, width: 100, height: 140 },
-  ]
-  zones.forEach((zone) => {
-    const target = new Graphics().rect(zone.x, zone.y, zone.width, zone.height).fill({ color: 0xffffff, alpha: 0.001 })
-    target.eventMode = 'static'
-    target.cursor = 'pointer'
-    target.on('pointertap', () => {
-      callbacks.onFeature?.(zone.type, zone)
-      openOverlay(zone.type)
-    })
-    scene.addChild(target)
+  // Plant only
+  if (type === 'plant') {
+    const water = new Sprite(textures.waterButton)
+
+    water.position.set(60, 50)
+
+    clickable(water, () => {
+      callbacks.onFeature?.('plant-water')
+
+      stopWatering()
+
+      const pot = new Sprite(textures.wateringPot)
+      pot.position.set(710, 150)
+
+      const drops = new Sprite(textures.waterDrops)
+      drops.position.set(630, 350)
+
+      overlay.addChild(pot, drops)
+
+      wateringAnimation = {
+        pot,
+        drops,
+        elapsed: 0,
+      }
+    }, 'Water plant')
+
+    overlay.addChild(water)
+  }
+
+  activeOverlay = type
+  overlay.visible = true
+}
+
+const zones = [
+  { type: 'tv', x: 251, y: 275, width: 230, height: 150 },
+  { type: 'radio', x: 800, y: 480, width: 130, height: 80 },
+  { type: 'plant', x: 500, y: 290, width: 100, height: 140 },
+]
+
+zones.forEach((zone) => {
+  const target = new Graphics()
+    .rect(zone.x, zone.y, zone.width, zone.height)
+    .fill({ color: 0xffffff, alpha: 0.001 })
+
+  target.eventMode = 'static'
+  target.cursor = 'pointer'
+
+  target.on('pointertap', () => {
+    callbacks.onFeature?.(zone.type, zone)
+
+    if (zone.type === 'radio') {
+      // Radio remains clickable, but has no interface.
+      return
+    }
+
+    openOverlay(zone.type)
   })
-  scene.addChild(overlay)
+
+  scene.addChild(target)
+})
 
   const keys = new Set()
   const keyDown = (event) => {

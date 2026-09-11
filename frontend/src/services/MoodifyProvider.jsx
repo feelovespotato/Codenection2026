@@ -7,6 +7,11 @@ export default function MoodifyProvider({ children }) {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
+  // Suggestion cache, keyed by kind ('shed' | 'recovery' | 'timetable'). Lives here (not inside
+  // DashboardView) so a fetch triggered from CalendarView on page-open is visible to Dashboard,
+  // and switching Dashboard tabs no longer needs to re-fetch.
+  const [suggestions, setSuggestions] = useState({})
+  const [suggestionsLoading, setSuggestionsLoading] = useState({})
   const serial = useRef(0)
   const mutation = useRef(false)
   const refresh = useCallback(async () => {
@@ -37,5 +42,23 @@ export default function MoodifyProvider({ children }) {
     } catch (failure) { setError(failure.message); throw failure }
     finally { mutation.current = false; setBusy(false) }
   }, [refresh])
-  return <MoodifyContext.Provider value={{ data, error, loading, busy, refresh, run }}>{children}</MoodifyContext.Provider>
+  // On-demand suggestion fetch. Callers: CalendarView (once, when that page opens) and
+  // DashboardView's "Refresh suggestion" button (manual). Tags the cached result with the
+  // data.revision at fetch time, so consumers can detect staleness (e.g. after an approve()
+  // elsewhere bumps the revision via refresh()) without this needing to auto-refetch itself.
+  const fetchSuggestion = useCallback(async (kind) => {
+    if (!data) return null
+    setSuggestionsLoading(current => ({ ...current, [kind]: true }))
+    try {
+      const response = await api('/proposals', { method: 'POST', body: { kind, date: data.date } })
+      setSuggestions(current => ({ ...current, [kind]: { ...response, revision: data.revision } }))
+      return response
+    } catch (failure) {
+      setSuggestions(current => ({ ...current, [kind]: { ...(current[kind] || {}), error: failure.message } }))
+      throw failure
+    } finally {
+      setSuggestionsLoading(current => ({ ...current, [kind]: false }))
+    }
+  }, [data])
+  return <MoodifyContext.Provider value={{ data, error, loading, busy, refresh, run, suggestions, suggestionsLoading, fetchSuggestion }}>{children}</MoodifyContext.Provider>
 }

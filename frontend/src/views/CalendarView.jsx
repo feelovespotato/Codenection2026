@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useMoodify } from '../services/moodify-context.js'
 import { displaySlot, localDate } from '../services/dates.js'
 import BackendStatus from '../components/BackendStatus.jsx'
@@ -7,6 +7,64 @@ const inputClass = 'mt-1 w-full rounded-xl border border-stone-300 bg-white px-3
 const buttonClass = 'rounded-xl bg-amber-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-amber-800 disabled:opacity-50'
 const secondaryClass = 'rounded-xl border border-stone-300 bg-white px-3 py-2.5 text-sm font-semibold text-stone-700 hover:bg-stone-50 disabled:opacity-50'
 const categoryClass = { cognitive: 'bg-indigo-100 text-indigo-900', social: 'bg-amber-100 text-amber-900', recharge: 'bg-emerald-100 text-emerald-900' }
+
+const SUGGESTIONS = [
+  { kind: 'shed', tab: '🧹 Shed a task', title: 'Lighten the load', description: 'Find one low-consequence flexible task that can move to a lighter day within the next three days.' },
+  { kind: 'recovery', tab: '🌿 Recover', title: 'Take a breather', description: 'Find a free slot and a recovery activity matched to today’s stress and scheduled load.' },
+  { kind: 'timetable', tab: '🔄 Reshuffle', title: 'Rework the day', description: 'Review flexible-task alternatives individually. Approve one move, then refresh the rest.' },
+]
+
+function SuggestionCard({ kind, title, description }) {
+  // Reads from the shared suggestions cache (populated once when this page opened) rather than
+  // fetching itself. Only an explicit "Refresh suggestion" click triggers a new fetch here.
+  const { data, busy, run, suggestions, suggestionsLoading, fetchSuggestion } = useMoodify()
+  const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
+  const [writeToGoogle, setWriteToGoogle] = useState(false)
+  const result = suggestions[kind]
+  const pending = !!suggestionsLoading[kind]
+  const stale = result && result.revision !== data.revision
+  async function refreshSuggestion() {
+    setError(''); setNotice('')
+    try { await fetchSuggestion(kind) } catch (failure) { setError(failure.message) }
+  }
+  async function approve(proposal) {
+    setError(''); setNotice('')
+    try {
+      await run(`/proposals/${proposal.id}/apply`, { approved: true, writeToGoogle })
+      setNotice(kind === 'recovery' ? 'Recovery scheduled. Finish an in-app breathing session to build your completed-session streak.' : 'Task moved. Capacity has been recalculated. Refresh for any further moves.')
+    } catch (failure) { setError(failure.message) }
+  }
+  return <div>
+    <h4 className="font-bold text-stone-900">{title}</h4>
+    <p className="mt-1 text-sm leading-relaxed text-stone-600">{description}</p>
+    {pending && !result && <p role="status" className="mt-3 text-sm text-stone-500">Finding safe options…</p>}
+    {!pending && !result && !error && <p className="mt-3 text-sm text-stone-500">No suggestion yet — refresh below.</p>}
+    <button type="button" className={`${buttonClass} mt-4`} disabled={pending || busy} onClick={refreshSuggestion}>{pending ? 'Finding safe options…' : 'Refresh suggestion'}</button>
+    {error && <p role="alert" className="mt-3 text-sm text-rose-700">{error}</p>}
+    {notice && <p role="status" className="mt-3 text-sm text-emerald-800">{notice}</p>}
+    {result?.message && <p role="status" className="mt-3 text-sm text-stone-600">{result.message}</p>}
+    {stale && <p role="status" className="mt-3 text-sm text-amber-800">Your schedule changed since this suggestion was generated. Click "Refresh suggestion" for an up-to-date one.</p>}
+    {!stale && result?.proposals?.map(proposal => {
+      const event = data.events.find(e => e.id === proposal.eventId)
+      const needsWrite = event?.source === 'google' && !data.google.canWrite
+      return <div key={proposal.id} className="mt-4 rounded-xl border border-amber-200 bg-amber-50/60 p-4 text-sm text-stone-800">
+        <h4 className="font-bold">{proposal.title}</h4>
+        <dl className="mt-3 space-y-2">
+          {proposal.before && <div><dt className="text-xs font-semibold uppercase text-stone-500">Before</dt><dd>{displaySlot(proposal.before, data.zone)}</dd></div>}
+          <div><dt className="text-xs font-semibold uppercase text-stone-500">{proposal.before ? 'After' : 'Available time'}</dt><dd>{displaySlot(proposal.after, data.zone)}</dd></div>
+        </dl>
+        {proposal.before && <p className="mt-3 font-semibold">Today: {proposal.beforeCapacity}% → {proposal.afterCapacity}% <span className="text-emerald-800">({proposal.beforeCapacity - proposal.afterCapacity} points lower)</span></p>}
+        {proposal.targetAfter && <p className="mt-1 text-xs">Destination day load: {proposal.targetBefore.totalLoadHours} → {proposal.targetAfter.totalLoadHours} hrs.</p>}
+        <p className="mt-2 text-xs leading-relaxed text-stone-600">{proposal.reason}</p>
+        {proposal.generation && <p className="mt-2 text-xs text-stone-600">{proposal.generation === 'ai' ? `AI ${kind === 'recovery' ? 'activity selection' : 'ranking'} · ${proposal.provider}` : 'Local scheduling rules · AI unavailable or disabled'}</p>}
+        {kind === 'recovery' && data.google.canWrite && <label className="mt-3 flex items-center gap-2"><input type="checkbox" checked={writeToGoogle} onChange={e => setWriteToGoogle(e.target.checked)} />Also insert into Google Calendar</label>}
+        {needsWrite && <p className="mt-2 text-amber-800">Open Calendar and enable Google write access first.</p>}
+        <button type="button" className={`${buttonClass} mt-3`} disabled={busy || needsWrite} onClick={() => approve(proposal)}>{busy ? 'Applying…' : kind === 'recovery' ? `Insert into ${writeToGoogle ? 'Google Calendar' : 'Moodify calendar'}` : `Approve this move${event?.source === 'google' ? ' in Google' : ''}`}</button>
+      </div>
+    })}
+  </div>
+}
 
 function EventForm({ date, zone, event, onDone }) {
   const { busy, run } = useMoodify()
@@ -44,8 +102,23 @@ function EventForm({ date, zone, event, onDone }) {
   </form>
 }
 
+// Lightweight popup for Add/Edit — deliberately not the shared <Modal>. CalendarView is already
+// rendered inside that Modal (from App.jsx), and Modal's Escape/Tab handling is a global window
+// listener; nesting a second one would mean pressing Escape to close this popup also closes the
+// whole Calendar page. This overlay only closes via backdrop click or the form's own Cancel/Save.
+function EventFormPopup({ date, zone, event, onDone }) {
+  return <div
+    className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4"
+    onClick={e => { if (e.target === e.currentTarget) onDone() }}
+  >
+    <div className="w-full max-w-lg max-h-[85vh] overflow-y-auto">
+      <EventForm date={date} zone={zone} event={event} onDone={onDone} />
+    </div>
+  </div>
+}
+
 export default function CalendarView() {
-  const { data, busy, run } = useMoodify()
+  const { data, busy, run, fetchSuggestion } = useMoodify()
   const [selectedDate, setSelectedDate] = useState('')
   const [viewMonth, setViewMonth] = useState(() => {
     const d = new Date()
@@ -53,6 +126,7 @@ export default function CalendarView() {
   })
   const [editing, setEditing] = useState(null)
   const [adding, setAdding] = useState(false)
+  const [activeSuggestion, setActiveSuggestion] = useState('shed')
   const [message, setMessage] = useState(() => {
     const params = new URLSearchParams(window.location.search)
     const status = params.get('calendar')
@@ -75,6 +149,13 @@ export default function CalendarView() {
   const date = selectedDate || data?.date || ''
   const zone = data?.zone || 'Asia/Kuala_Lumpur'
   const events = (data?.events || []).filter(event => localDate(event.start, zone) <= date && localDate(Date.parse(event.end) - 1, zone) >= date).sort((a, b) => Date.parse(a.start) - Date.parse(b.start))
+  // This component only exists while the Calendar modal is open (App.jsx mounts/unmounts it),
+  // so "on mount" here means "when the user opens the Calendar page" — exactly once per open.
+  const activeSuggestionMeta = SUGGESTIONS.find(s => s.kind === activeSuggestion)
+  useEffect(() => {
+    ['shed', 'recovery', 'timetable'].forEach(kind => { fetchSuggestion(kind).catch(() => {}) })
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally once per Calendar page open, not on every data change
+  }, [])
   async function action(path, body, notice, method) {
     setMessage(''); setError('')
     try { const result = await run(path, body, method); setMessage(typeof notice === 'function' ? notice(result) : notice); return result }
@@ -104,7 +185,6 @@ export default function CalendarView() {
             <button className={secondaryClass} disabled={busy} onClick={() => action('/google/disconnect', {}, 'Disconnected. Google events were removed from Moodify; your Google calendar was not changed.')}>Disconnect</button>
           </>}
           <label className={`${secondaryClass} cursor-pointer`}>Import .ics<input type="file" accept=".ics,text/calendar" aria-label="Import .ics calendar file" onChange={importFile} disabled={busy} className="mt-2 block max-w-full text-xs" /></label>
-          <a href="/api/calendar/export" className={secondaryClass}>Export .ics</a>
         </div>
         {!data.google.configured && <p className="mt-3 text-xs text-stone-600">Google connection needs OAuth setup. You can use .ics import and all local scheduling features now.</p>}
         {data.google.connected && <p className="mt-3 text-xs text-emerald-800">Connected · {data.google.canWrite ? 'Writes enabled; each move still requires approval' : 'Read-only access'} · {data.google.lastSync ? `Last sync: ${new Date(data.google.lastSync).toLocaleString()}` : 'Not synced yet'}</p>}
@@ -113,6 +193,7 @@ export default function CalendarView() {
           <button className={secondaryClass} disabled={busy}>Set time zone</button>
         </form>
       </section>
+
       {busy && <p role="status" className="text-sm text-stone-600">Saving or syncing your calendar…</p>}
       {message && <p role="status" className="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-900">{message}</p>}
       {error && <p role="alert" className="rounded-xl bg-rose-50 p-3 text-sm text-rose-900">{error}</p>}
@@ -169,7 +250,7 @@ export default function CalendarView() {
           </div>
         </div>
       </div>
-      {(adding || editing) && <EventForm key={editing?.id || `new-${date}`} date={date} zone={zone} event={editing} onDone={() => { setAdding(false); setEditing(null) }} />}
+      {(adding || editing) && <EventFormPopup key={editing?.id || `new-${date}`} date={date} zone={zone} event={editing} onDone={() => { setAdding(false); setEditing(null) }} />}
       <p className="text-xs text-stone-500">{events.length} commitments · {zone} · Changes are saved to the backend for this browser session.</p>
       <div className="space-y-3">
         {events.length === 0 && <p className="rounded-2xl border border-dashed border-stone-300 p-8 text-center text-sm text-stone-500">No commitments on this day. Import your calendar or add an event to calculate your load.</p>}
@@ -189,6 +270,19 @@ export default function CalendarView() {
           {pendingDelete === event.id && <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl bg-rose-50 p-3"><span>Delete this commitment from Moodify?</span><button className="rounded-lg bg-rose-700 px-3 py-2 font-semibold text-white" disabled={busy} onClick={async () => { const result = await action(`/events/${event.id}`, {}, 'Event deleted.', 'DELETE'); if (result) setPendingDelete(null) }}>Delete event</button><button className={secondaryClass} onClick={() => setPendingDelete(null)}>Keep event</button></div>}
         </article>)}
       </div>
+      {/* Rebalancing suggestions, moved here from Dashboard since approving one mutates the
+          calendar directly. Fetched once above when this page opened; tabs just switch which
+          cached suggestion is shown. */}
+      <section className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
+        <h3 className="font-bold text-stone-900">✨ Balance your week</h3>
+        <div className="mt-3 flex flex-wrap gap-2" role="tablist" aria-label="Suggestion type">
+          {SUGGESTIONS.map(s => <button key={s.kind} type="button" role="tab" aria-selected={activeSuggestion === s.kind} onClick={() => setActiveSuggestion(s.kind)} className={`rounded-xl border-2 px-3 py-2 text-sm font-bold transition ${activeSuggestion === s.kind ? 'border-amber-600 bg-amber-100 text-amber-900' : 'border-stone-200 bg-stone-50 text-stone-600 hover:bg-stone-100'}`}>{s.tab}</button>)}
+        </div>
+        <div className="mt-4 border-t border-stone-100 pt-4" role="tabpanel">
+          <SuggestionCard key={activeSuggestionMeta.kind} kind={activeSuggestionMeta.kind} title={activeSuggestionMeta.title} description={activeSuggestionMeta.description} />
+        </div>
+        <p className="mt-4 text-xs text-stone-500">Suggestions use explainable scheduling rules. Calendar gaps are an inactivity proxy; actual physical inactivity is not measured.</p>
+      </section>
     </>}
   </div>
 }

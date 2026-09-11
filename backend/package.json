@@ -9,7 +9,7 @@
   },
   "dependencies": {
     "express": "^5.1.0",
-    "google-auth-library": "^10.0.0",
+    "google-auth-library": "^10.9.1",
     "luxon": "^3.7.0",
     "node-ical": "^0.25.0"
   }
