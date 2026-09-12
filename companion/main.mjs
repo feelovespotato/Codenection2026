@@ -42,7 +42,7 @@ function createCompanionWindow() {
   const load = async () => {
     try {
       if (app.isPackaged) {
-        await companionWindow.loadURL('https://moodify-frontend-1bdvu8j83-peijia-s-projects.vercel.app/companion.html')
+        await companionWindow.loadURL('https://moodify-frontend-kappa.vercel.app/companion.html')
       } else {
         await companionWindow.loadURL('http://localhost:5173/companion.html')
       }
