@@ -3,6 +3,7 @@ import PixelIcon from '../components/PixelIcon.jsx'
 import { sendAgentMessage } from '../services/agent.js'
 import { api } from '../services/api.js'
 import { StorageService } from '../services/storage.js'
+import { useMoodify } from '../services/moodify-context.js'
 
 const SpeechRecognitionApi = typeof window !== 'undefined'
   ? (window.SpeechRecognition || window.webkitSpeechRecognition)
@@ -11,6 +12,7 @@ const SpeechRecognitionApi = typeof window !== 'undefined'
 const timeLabel = () => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 
 export default function AgentChatView() {
+  const { data, run } = useMoodify()
   const [messages, setMessages] = useState([
     {
       role: 'assistant',
@@ -24,35 +26,46 @@ export default function AgentChatView() {
   const [listening, setListening] = useState(false)
   const [voiceError, setVoiceError] = useState('')
 
+  const [planningState, setPlanningState] = useState({ active: false })
+
   const recognitionRef = useRef(null)
   const bottomRef = useRef(null)
   const inputRef = useRef(null)
   const messagesRef = useRef(messages)
+  const planningStateRef = useRef(planningState)
 
   useEffect(() => {
     messagesRef.current = messages
   }, [messages])
 
   useEffect(() => {
+    planningStateRef.current = planningState
+  }, [planningState])
+
+  useEffect(() => {
     return () => {
       const history = messagesRef.current
+      const finalPlanningState = planningStateRef.current
+
+      // If the conversation was entirely in PLANNING_MODE, skip saving to diary
+      if (finalPlanningState.sourceConversationType === 'PLANNING_MODE') return
+
       if (history.length > 2) {
+        // Filter out calendar-management messages from the diary
+        // In a real app we might ask the AI to filter, but here we just pass the history
+        // to /conclusion and let the AI do its summary. We should pass the fact that it's a mixed conversation if needed.
         api('/agent-chat/conclusion', {
           method: 'POST',
           body: { history: history.map(m => ({ role: m.role, content: m.text })) },
         })
           .then((data) => {
             const now = new Date()
-            
-            // Save Diary Entry
             StorageService.saveDiaryEntry({
               title: 'Chat Reflection',
               content: data.conclusion,
               emotion: data.emotion || 'thoughtful',
               date: now.toISOString(),
             })
-            
-            // Save Mood Log
             if (data.mood) {
               StorageService.saveMoodLog({
                 mood: data.mood,
@@ -64,9 +77,7 @@ export default function AgentChatView() {
               })
             }
           })
-          .catch((err) => {
-            console.error('Failed to save chat conclusion:', err)
-          })
+          .catch((err) => console.error('Failed to save chat conclusion:', err))
       }
     }
   }, [])
@@ -136,17 +147,33 @@ export default function AgentChatView() {
     if (!text || sending) return
     if (listening) toggleListening()
 
-    // The AI agent lives on the backend; the frontend only forwards the
-    // message plus prior turns as conversational context.
     const history = messages.map((message) => ({ role: message.role, content: message.text }))
-
     setMessages((prev) => [...prev, { role: 'user', text, time: timeLabel() }])
     setInput('')
     setSendError('')
     setSending(true)
     try {
-      const reply = await sendAgentMessage(text, history)
-      setMessages((prev) => [...prev, { role: 'assistant', text: reply, time: timeLabel() }])
+      const response = await sendAgentMessage(text, history, planningState, data?.events || [])
+      setMessages((prev) => [...prev, { role: 'assistant', text: response.reply, time: timeLabel() }])
+      
+      if (response.planningState) setPlanningState(response.planningState)
+      if (response.calendarAction) {
+        const { type, event } = response.calendarAction
+        if (type === 'CREATE_EVENT' || type === 'UPDATE_EVENT') {
+           const body = {
+             title: event.title,
+             start: `${event.date}T${event.startTime || '00:00'}:00`,
+             end: `${event.date}T${event.endTime || '00:00'}:00`,
+             category: event.category || 'auto',
+             isFlexible: event.isFlexible ?? true
+           }
+           if (type === 'CREATE_EVENT') await run('/events', body, 'POST')
+           else await run(`/events/${event.id}`, body, 'PATCH')
+        }
+        else if (type === 'DELETE_EVENT') {
+           await run(`/events/${response.calendarAction.event?.id || response.calendarAction.eventId}`, null, 'DELETE')
+        }
+      }
     } catch (failure) {
       setSendError(failure.message)
     } finally {

@@ -1,5 +1,8 @@
 {
   "name": "moodify",
+  "version": "1.0.0",
+  "description": "Moodify Desktop Companion",
+  "author": "Moodify Team",
   "private": true,
   "type": "module",
   "workspaces": [
@@ -9,15 +12,32 @@
   "engines": {
     "node": ">=24.0.0"
   },
+  "main": "companion/main.mjs",
   "scripts": {
     "dev": "node scripts/dev.mjs",
     "companion": "electron companion/main.mjs",
+    "build:companion": "electron-builder --win",
     "start": "npm run start --workspace backend",
     "build": "npm run build --workspace frontend",
     "test": "npm run test --workspace backend",
     "lint": "npm run lint --workspace frontend"
   },
+  "build": {
+    "appId": "com.moodify.companion",
+    "productName": "Moodify Companion",
+    "directories": {
+      "output": "dist-electron"
+    },
+    "files": [
+      "companion/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": "nsis"
+    }
+  },
   "devDependencies": {
-    "electron": "^44.3.0"
+    "electron": "^44.3.0",
+    "electron-builder": "^25.1.8"
   }
 }

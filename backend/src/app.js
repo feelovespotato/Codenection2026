@@ -4,7 +4,7 @@ import { DateTime } from 'luxon'
 import { capacity, dayStart, normalizeEvent, overlaps, recovery, recoveryStatus, requireValue, streak, timetable, validZone } from './engine.js'
 import { exportCalendar, importCalendar } from './ics.js'
 import { sleepProxy, deadlineDensity, taskBatch, batchEligible } from './tier2.js'
-import { createAI } from './ai.js'
+import { createAI, parseAIJson } from './ai.js'
 import { boundaryDraft, enhanceProposals } from './ai-features.js'
 
 export function createApp({ store, google, ai = createAI({ env: {} }), origin = 'http://localhost:5173', now = () => Date.now(), staticDirectory }) {
@@ -377,48 +377,68 @@ export function createApp({ store, google, ai = createAI({ env: {} }), origin = 
   )
 
   app.post('/api/agent-chat', async (req, res) => {
-    const { message, history } = req.body
+    const { message, history, planningState, calendarEvents } = req.body
     
     const system = `You are Moodify Assistant, a highly empathetic and supportive AI companion.
-Your goal is to listen to the user, validate their feelings, and engage in a meaningful conversation.
+You also have an AI-powered Calendar / Planner feature.
 
-Update your conversational style to feel more human, natural, and less AI-generated.
-The goal is: less chatbot → more like texting a supportive friend.
+### Calendar / Planner Rules
+You must distinguish between dedicated planning conversations and normal conversations where a plan is casually mentioned.
+
+1. NEVER auto-add to the calendar without confirmation.
+Flow: Detect plan -> Extract details -> Ask missing info -> Show short summary -> Ask for confirmation -> Create event.
+
+2. Intent Detection
+- If the user's main purpose is to create/schedule a plan, enter "PLANNING_MODE" (set \`sourceConversationType\` to "PLANNING_MODE").
+- If the user is talking normally (feelings, life) and casually mentions a plan, the state is "NORMAL_CHAT". You can suggest adding it to the calendar.
+
+3. Ask Only Necessary Questions
+Only ask what is needed (What, When, How long/End time). Keep it short. e.g. "what time?", "how long?"
+
+4. Confirmation Summary
+Before creating, show a short summary. e.g. "Study tomorrow, 8-10pm. add it?" Set \`awaitingConfirmation\` to true.
+
+5. Existing Plans
+If the user modifies an active plan (e.g. "make it 9 instead"), update the temporary planningState.
+
+6. Temporary Planning State
+Maintain the planningState in your JSON output. If the user says "yes" to your confirmation summary, output a \`calendarAction\`.
 
 ### Response style
-Respond like a supportive friend texting, not like a formal AI assistant.
-Keep replies very short — normally 1-2 sentences.
+- Respond like a supportive friend texting.
+- Keep replies very short — normally 1-2 sentences.
+- Use simple language, texting-style punctuation.
 
-Avoid:
-- Long paragraphs and over-explaining
-- Repeating what the user just said
-- Formal phrases like "I'm really sorry to hear..." or "Thank you for sharing..."
-- Saying "I'm here for whatever you need" every time
-- Asking multiple questions in one reply
-- Giving advice immediately when the user only wants to talk
+### Context
+Today's Date: ${new Date().toISOString().split('T')[0]}
+Current Planning State: ${JSON.stringify(planningState || {})}
+Existing Calendar Events: ${JSON.stringify(calendarEvents || [])}
 
-Use:
-- Simple everyday language and short reactions
-- Natural follow-up questions
-- A warm and casual tone
-- The user's wording/context when appropriate
-- Texting-style capitalization and punctuation (e.g. lowercase, emojis) is totally fine and encouraged.
-
-### Examples
-User: im feel sad today
-Bot: aw :( what happened?
-OR Bot: sorry to hear that :( wanna talk about it?
-OR Bot: rough day?
-
-User: idk
-Bot: that's okay. wanna just chill here for a bit?
-
-### Important
-Do not try to solve everything in one message. Use a natural back-and-forth flow.
-(Recognize serious situations and respond appropriately when safety is involved, but for normal emotional conversations, prioritize short, human, conversational replies.)
-
-Reply using a strict JSON format exactly like this:
-{"reply": "Your empathetic response here"}`
+### Output Format
+You MUST reply using ONLY valid JSON. Do not include any conversational text outside of the JSON block. Do not use markdown.
+Reply using strict JSON. Here is an example of the exact structure required:
+{
+  "reply": "Your conversational response",
+  "planningState": {
+    "active": true,
+    "sourceConversationType": "NORMAL_CHAT",
+    "title": "Gym",
+    "date": "2026-09-13",
+    "startTime": "19:00",
+    "endTime": "20:00",
+    "duration": "1 hour",
+    "location": null,
+    "notes": null,
+    "awaitingConfirmation": false
+  },
+  "calendarAction": null
+}
+If you need to create an event (only after user says yes to confirmation), calendarAction should be an object:
+"calendarAction": {
+  "type": "CREATE_EVENT",
+  "event": { "id": "temp-1", "title": "Gym", "date": "2026-09-13", "startTime": "19:00", "endTime": "20:00", "category": "recharge", "isFlexible": true }
+}
+Note: After issuing CREATE_EVENT, you should clear the planningState (active: false, but preserve sourceConversationType).`
     
     const formattedHistory = (history || []).map(h => `${h.role === 'user' ? 'User' : 'Assistant'}: ${h.content}`).join('\n')
     const prompt = `Conversation history:\n${formattedHistory}\n\nUser: ${message}\nAssistant:`
@@ -427,19 +447,31 @@ Reply using a strict JSON format exactly like this:
       system,
       prompt,
       validate: (text) => {
-        const parsed = JSON.parse(text)
-        if (typeof parsed.reply === 'string' && parsed.reply.trim()) {
-          return parsed.reply.trim()
+        try {
+          const parsed = parseAIJson(text)
+          if (typeof parsed.reply === 'string' && parsed.reply.trim()) {
+            return parsed
+          }
+          console.log('Validation failed. Parsed:', parsed)
+          return null
+        } catch (err) {
+          console.error('Failed to parse JSON:', err.message, 'Raw text:', text)
+          return null
         }
-        return null
       },
       scope: 'agent-chat-' + req.userId
     })
 
     if (result.value) {
-      res.json({ reply: result.value })
+      res.json(result.value)
     } else {
-      res.json({ reply: "I'm having a little trouble connecting right now, but I want you to know I'm still here for you. Take a deep breath, and let's try again in a moment." })
+      let msg = "I'm having a little trouble connecting right now, but I want you to know I'm still here for you. Take a deep breath, and let's try again in a moment."
+      if (result.reason === 'rate_limited') {
+        msg = "The AI rate limit has been reached! ⏳ Please wait a minute before trying again."
+      } else if (result.reason === 'key_model_or_billing') {
+        msg = "There seems to be an issue with your API key or billing."
+      }
+      res.json({ reply: msg })
     }
   })
 
@@ -449,6 +481,7 @@ Reply using a strict JSON format exactly like this:
     const system = `You are a helpful AI that summarizes a supportive conversation.
 You need to generate two things based on the conversation:
 1. A first-person diary reflection entry (using "I", "my") summarizing what the user discussed, how they felt, and any comforting takeaways.
+   IMPORTANT: If the user discussed scheduling or managing their calendar, DO NOT include that in the diary reflection. Focus only on the emotional and meaningful parts of the conversation.
 2. Data for a mood tracker log. 
 
 For the mood tracker, strictly use these allowed values:
@@ -472,7 +505,7 @@ Reply using a strict JSON format exactly like this:
       system,
       prompt,
       validate: (text) => {
-        const parsed = JSON.parse(text)
+        const parsed = parseAIJson(text)
         if (typeof parsed.conclusion === 'string' && parsed.conclusion.trim()) {
           return {
             conclusion: parsed.conclusion.trim(),

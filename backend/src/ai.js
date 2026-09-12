@@ -6,7 +6,20 @@ const SPECS = {
 }
 const bounded = (value, fallback, min, max) => Number.isFinite(Number(value)) && value !== undefined && value !== '' ? Math.min(max, Math.max(min, Number(value))) : fallback
 export function parseAIJson(text) {
-  return JSON.parse(text.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, ''))
+  let cleanText = text.trim()
+  const match = cleanText.match(/```(?:json)?\s*([\s\S]*?)\s*```/i)
+  if (match) {
+    cleanText = match[1]
+  } else {
+    cleanText = cleanText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '')
+    // Also try to find the first { and last } if it's still failing
+    const start = cleanText.indexOf('{')
+    const end = cleanText.lastIndexOf('}')
+    if (start >= 0 && end >= start) {
+      cleanText = cleanText.slice(start, end + 1)
+    }
+  }
+  return JSON.parse(cleanText)
 }
 
 export function createAI({ env = process.env, fetchImpl = fetch, now = Date.now } = {}) {
@@ -103,11 +116,15 @@ export function createAI({ env = process.env, fetchImpl = fetch, now = Date.now 
           provider.until = 0; provider.failure = null
           return { value: result.value, method: 'ai', provider: provider.label, model: provider.model }
         } catch (error) {
+          console.error(`Provider ${provider.label} failed:`, error.message, error.safeReason)
           provider.failure = error.safeReason || 'invalid_or_unavailable'
           provider.until = now() + (error.delay || cooldownMs)
           // Never log provider bodies, credentials, request headers or user prompts.
         } finally { clearTimeout(timer); controller.abort() }
       }
+      const failures = providers.map(p => p.failure).filter(Boolean)
+      if (failures.includes('rate_limited')) return fallback('rate_limited')
+      if (failures.includes('key_model_or_billing')) return fallback('key_model_or_billing')
       return fallback('unavailable')
     } finally { active-- }
   }

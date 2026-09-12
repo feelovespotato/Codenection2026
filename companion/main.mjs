@@ -41,8 +41,11 @@ function createCompanionWindow() {
 
   const load = async () => {
     try {
-      if (app.isPackaged) await companionWindow.loadFile(`${source}dist/companion.html`)
-      else await companionWindow.loadURL('http://localhost:5173/companion.html')
+      if (app.isPackaged) {
+        await companionWindow.loadURL('https://moodify-frontend-1bdvu8j83-peijia-s-projects.vercel.app/companion.html')
+      } else {
+        await companionWindow.loadURL('http://localhost:5173/companion.html')
+      }
     } catch {
       if (!companionWindow?.isDestroyed()) setTimeout(load, 750)
     }
