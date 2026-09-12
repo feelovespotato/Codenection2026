@@ -80,7 +80,7 @@ Table of every distinct idea generated, with why each was kept or dropped, order
 
 ## 2.2 Ideation Boards
 
-![Mindmap](docs/mindmap.jpeg)
+[![Mindmap](docs/mindmap.jpeg)](docs/mindmap.jpeg)
 
 ## 2.3 Mentor Consultation
 
@@ -95,18 +95,18 @@ Table of every distinct idea generated, with why each was kept or dropped, order
 
 | Key screen | What the interaction demonstrates |
 | --- | --- |
-| ![main_page](docs/UI/main_page.png) | An interactive pixel-art space that makes wellness feel like play, replacing clinical menus with clickable objects. |
-| ![dashboard](docs/UI/dashboard.png) | Capacity, workload, mood/check-in, and immediate status at a glance. |
-| ![calendar](docs/UI/calendar.png) | Uses your schedule as an objective workload baseline, organising flexible and fixed events to help safely rebalance overloaded days. |
-| ![Google Sync](docs/UI/google_sync.png) | Connects your existing life securely. Moodify analyses your real events while keeping you in full control of any schedule changes. |
-| ![chat_room](docs/UI/chat_room.png) | A lightweight multiplayer lounge offering a supportive, low-pressure space for students to connect and reduce isolation. |
-| ![ai_chat](docs/UI/ai_chat.png) | A conversational companion to think out loud, helping translate feelings into practical recovery. |
-| ![ai_chat_to_schedule](docs/UI/ai_schedule.png) | Turns natural conversation into proposed calendar events. The AI structures your plan, but you always control where it gets saved. |
-| ![ambient_music](docs/UI/ambient_music.png) | Built-in background audio and focus timers to tune out distractions and sustain a healthy work rhythm. |
-| ![breathe](docs/UI/breathe.png) | Integrated breathing exercises that provide immediate, in-the-moment recovery to help lower stress without leaving the app. |
-| ![mood_tracker](docs/UI/mood_tracker.png) | Captures the subjective side of stress—emotions and triggers—to measure how a schedule actually feels. |
-| ![diary](docs/UI/diary.png) | Reflection loop connecting conversations to diary/mood tracking while keeping dedicated planning conversations separate. |
-| ![stress](docs/UI/stress.png) | A quick 1–5 daily check-in that measures perceived heaviness, combining subjective feelings with objective calendar load. |
+| [![main_page](docs/UI/main_page.png)](docs/UI/main_page.png) | An interactive pixel-art space that makes wellness feel like play, replacing clinical menus with clickable objects. |
+| [![dashboard](docs/UI/dashboard.png)](docs/UI/dashboard.png) | Capacity, workload, mood/check-in, and immediate status at a glance. |
+| [![calendar](docs/UI/calendar.png)](docs/UI/calendar.png) | Uses your schedule as an objective workload baseline, organising flexible and fixed events to help safely rebalance overloaded days. |
+| [![Google Sync](docs/UI/google_sync.png)](docs/UI/google_sync.png) | Connects your existing life securely. Moodify analyses your real events while keeping you in full control of any schedule changes. |
+| [![chat_room](docs/UI/chat_room.png)](docs/UI/chat_room.png) | A lightweight multiplayer lounge offering a supportive, low-pressure space for students to connect and reduce isolation. |
+| [![ai_chat](docs/UI/ai_chat.png)](docs/UI/ai_chat.png) | A conversational companion to think out loud, helping translate feelings into practical recovery. |
+| [![ai_chat_to_schedule](docs/UI/ai_schedule.png)](docs/UI/ai_schedule.png) | Turns natural conversation into proposed calendar events. The AI structures your plan, but you always control where it gets saved. |
+| [![ambient_music](docs/UI/ambient_music.png)](docs/UI/ambient_music.png) | Built-in background audio and focus timers to tune out distractions and sustain a healthy work rhythm. |
+| [![breathe](docs/UI/breathe.png)](docs/UI/breathe.png) | Integrated breathing exercises that provide immediate, in-the-moment recovery to help lower stress without leaving the app. |
+| [![mood_tracker](docs/UI/mood_tracker.png)](docs/UI/mood_tracker.png) | Captures the subjective side of stress—emotions and triggers—to measure how a schedule actually feels. |
+| [![diary](docs/UI/diary.png)](docs/UI/diary.png) | Reflection loop connecting conversations to diary/mood tracking while keeping dedicated planning conversations separate. |
+| [![stress](docs/UI/stress.png)](docs/UI/stress.png) | A quick 1–5 daily check-in that measures perceived heaviness, combining subjective feelings with objective calendar load. |
 
 # 4. What Makes It Different
 
@@ -149,7 +149,7 @@ The standout product idea is the **closed-loop relationship between detection an
 The current source also includes several feasibility safeguards: bounded AI request timeouts, provider cooldown/fallback behavior, explicit parsing/validation of AI output, Google token encryption, session handling, calendar conflict checks, and separate user approval before supported write actions. Core load calculations and scheduling constraints remain deterministic rather than depending entirely on an LLM, which makes the most important workload logic easier to explain and test.
 
 **System architecture diagram**
-![Moodify system_architecture](docs/system_architecture.png)
+[![Moodify system_architecture](docs/system_architecture.png)](docs/system_architecture.png)
 
 ### 1. Browser (Client Layer)
 
