@@ -129,25 +129,25 @@ export default function DiaryView() {
   return (
     <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
       {/* Left Column: Diary Editor */}
-      <div className="space-y-4 lg:col-span-7">
+      <div className="space-y-6 lg:col-span-7">
         {/* Prompt Card */}
-        <div className="pixel-inspiration flex items-start justify-between gap-3 rounded-xl border border-amber-200/80 bg-gradient-to-r from-amber-50 to-orange-50/60 p-3.5 shadow-sm">
-          <div className="space-y-1">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-amber-800/80"><PixelIcon symbol="✨" /> Daily Inspiration Prompt</span>
-            <p className="text-sm font-medium text-stone-800">"{WRITING_PROMPTS[promptIndex]}"</p>
+        <div className="pixel-inspiration flex items-start justify-between gap-4 rounded-xl border border-amber-200/80 bg-gradient-to-r from-amber-50 to-orange-50/60 p-4 sm:p-5 shadow-sm">
+          <div className="space-y-1.5">
+            <span className="text-sm font-bold uppercase tracking-wider text-amber-800/80"><PixelIcon symbol="✨" /> Daily Inspiration Prompt</span>
+            <p className="text-base sm:text-lg font-medium text-stone-800">"{WRITING_PROMPTS[promptIndex]}"</p>
           </div>
-          <div className="flex shrink-0 gap-1.5 pt-1">
+          <div className="flex shrink-0 gap-2 pt-1">
             <button
               type="button"
               onClick={handleUsePrompt}
-              className="rounded-lg bg-amber-200/70 px-2.5 py-1 text-xs font-semibold text-amber-900 transition hover:bg-amber-300"
+              className="rounded-lg bg-amber-200/70 px-4 py-2 text-sm font-semibold text-amber-900 transition hover:bg-amber-300"
             >
               Insert
             </button>
             <button
               type="button"
               onClick={handleNextPrompt}
-              className="rounded-lg border border-amber-300/80 bg-white px-2 py-1 text-xs text-amber-900 transition hover:bg-amber-100"
+              className="rounded-lg border border-amber-300/80 bg-white px-3 py-2 text-sm text-amber-900 transition hover:bg-amber-100"
               title="Shuffle prompt"
             >
               <PixelIcon symbol="🔄" />
@@ -156,16 +156,16 @@ export default function DiaryView() {
         </div>
 
         {/* Editor Form */}
-        <form onSubmit={handleSave} className="space-y-3 rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-stone-100 pb-3">
-            <div className="flex items-center gap-2">
-              <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-semibold ${detectedEmotion.color}`}>
+        <form onSubmit={handleSave} className="space-y-4 rounded-2xl border border-stone-200 bg-white p-6 sm:p-8 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-stone-100 pb-4">
+            <div className="flex items-center gap-3">
+              <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm font-semibold ${detectedEmotion.color}`}>
                 <span><PixelIcon symbol={detectedEmotion.emoji} /></span>
                 <span>{detectedEmotion.label}</span>
               </span>
-              <span className="text-xs text-stone-500"><PixelIcon symbol="⛅" /> {weather}</span>
+              <span className="text-sm text-stone-500"><PixelIcon symbol="⛅" /> {weather}</span>
             </div>
-            <div className="text-xs font-medium text-stone-400">
+            <div className="text-sm font-medium text-stone-400">
               <span>{wordCount} words</span>
             </div>
           </div>
@@ -175,7 +175,7 @@ export default function DiaryView() {
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Give this entry a title..."
-            className="w-full rounded-lg border border-stone-200 bg-stone-50/50 px-3.5 py-2 text-base font-semibold text-stone-800 placeholder-stone-400 focus:border-amber-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-200/50"
+            className="w-full rounded-lg border border-stone-200 bg-stone-50/50 px-4 py-3 text-lg font-semibold text-stone-800 placeholder-stone-400 focus:border-amber-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-200/50"
           />
 
           <textarea
@@ -183,10 +183,10 @@ export default function DiaryView() {
             onChange={(e) => setContent(e.target.value)}
             rows={8}
             placeholder="How are you feeling today? Write your thoughts freely..."
-            className="w-full resize-none rounded-lg border border-stone-200 bg-stone-50/50 p-3.5 text-sm leading-relaxed text-stone-800 placeholder-stone-400 focus:border-amber-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-200/50"
+            className="w-full resize-none rounded-lg border border-stone-200 bg-stone-50/50 p-4 text-base sm:text-lg leading-relaxed text-stone-800 placeholder-stone-400 focus:border-amber-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-200/50"
           />
 
-          <div className="flex items-center justify-between pt-1">
+          <div className="flex items-center justify-between pt-2">
             {editingId ? (
               <button
                 type="button"
@@ -195,18 +195,18 @@ export default function DiaryView() {
                   setTitle('')
                   setContent('')
                 }}
-                className="text-xs font-medium text-stone-500 underline hover:text-stone-800"
+                className="text-sm font-medium text-stone-500 underline hover:text-stone-800"
               >
                 Cancel Edit
               </button>
             ) : <div />}
 
-            <div className="flex items-center gap-3">
-              {saveToast && <span className="text-xs font-semibold text-emerald-600 animate-pulse">✓ Entry Saved!</span>}
+            <div className="flex items-center gap-4">
+              {saveToast && <span className="text-sm font-semibold text-emerald-600 animate-pulse">✓ Entry Saved!</span>}
               <button
                 type="submit"
                 disabled={!content.trim()}
-                className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 px-5 py-2 text-sm font-semibold text-white shadow-md transition hover:from-amber-700 hover:to-orange-700 disabled:opacity-50 active:scale-95"
+                className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 px-6 py-3 text-base font-semibold text-white shadow-md transition hover:from-amber-700 hover:to-orange-700 disabled:opacity-50 active:scale-95"
               >
                 <span>{editingId ? 'Update Reflection' : 'Save Reflection'}</span>
                 <span><PixelIcon symbol="💾" /></span>
@@ -219,48 +219,48 @@ export default function DiaryView() {
       {/* Right Column: History & Past Entries */}
       <div className="space-y-4 lg:col-span-5">
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-bold uppercase tracking-wider text-stone-600">Past Reflections ({entries.length})</h3>
+          <h3 className="text-base font-bold uppercase tracking-wider text-stone-600">Past Reflections ({entries.length})</h3>
           <input
             type="text"
             placeholder="Search entries..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="rounded-lg border border-stone-200 bg-white px-3 py-1 text-xs text-stone-700 placeholder-stone-400 focus:outline-none focus:ring-1 focus:ring-amber-400"
+            className="rounded-lg border border-stone-200 bg-white px-4 py-2 text-sm text-stone-700 placeholder-stone-400 focus:outline-none focus:ring-1 focus:ring-amber-400"
           />
         </div>
 
-        <div className="max-h-[500px] space-y-3 overflow-y-auto pr-1">
+        <div className="max-h-[600px] space-y-4 overflow-y-auto pr-2">
           {filteredEntries.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-stone-300 p-8 text-center text-xs text-stone-400">
+            <div className="rounded-xl border border-dashed border-stone-300 p-10 text-center text-sm text-stone-400">
               No diary reflections found. Write your first thought on the left!
             </div>
           ) : (
             filteredEntries.map((entry) => (
               <div
                 key={entry.id}
-                className="group relative rounded-xl border border-stone-200 bg-white p-4 shadow-sm transition hover:border-amber-300 hover:shadow"
+                className="group relative rounded-xl border border-stone-200 bg-white p-5 shadow-sm transition hover:border-amber-300 hover:shadow"
               >
-                <div className="mb-1.5 flex items-center justify-between">
-                  <span className="text-xs font-bold text-stone-800">{entry.title}</span>
-                  <span className="text-[10px] text-stone-400">
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="text-base font-bold text-stone-800">{entry.title}</span>
+                  <span className="text-xs text-stone-400">
                     {new Date(entry.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                   </span>
                 </div>
-                <p className="line-clamp-3 text-xs leading-relaxed text-stone-600">{entry.content}</p>
-                <div className="mt-3 flex items-center justify-between border-t border-stone-100 pt-2 text-[11px] text-stone-400">
-                  <span className="rounded bg-stone-100 px-1.5 py-0.5 text-stone-600">{entry.emotion || 'Reflective'}</span>
-                  <div className="flex items-center gap-2">
+                <p className="line-clamp-3 text-sm leading-relaxed text-stone-600">{entry.content}</p>
+                <div className="mt-4 flex items-center justify-between border-t border-stone-100 pt-3 text-xs text-stone-400">
+                  <span className="rounded bg-stone-100 px-2 py-1 text-stone-600">{entry.emotion || 'Reflective'}</span>
+                  <div className="flex items-center gap-3">
                     <button
                       type="button"
                       onClick={() => handleEdit(entry)}
-                      className="text-amber-700 hover:underline"
+                      className="text-amber-700 text-sm hover:underline"
                     >
                       Edit
                     </button>
                     <button
                       type="button"
                       onClick={() => handleDelete(entry.id)}
-                      className="text-rose-600 hover:underline"
+                      className="text-rose-600 text-sm hover:underline"
                     >
                       Delete
                     </button>

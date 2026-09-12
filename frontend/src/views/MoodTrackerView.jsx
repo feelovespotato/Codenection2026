@@ -54,10 +54,10 @@ export default function MoodTrackerView() {
       <div className="space-y-6 lg:col-span-7">
         {/* Mood Selection Carousel / Grid */}
         <div>
-          <label className="mb-3 block text-xs font-bold uppercase tracking-wider text-stone-500">
+          <label className="mb-4 block text-sm font-bold uppercase tracking-wider text-stone-500">
             How are you feeling right now?
           </label>
-          <div className="grid grid-cols-3 gap-3 sm:grid-cols-6">
+          <div className="grid grid-cols-3 gap-4 sm:grid-cols-6">
             {MOODS.map((m) => {
               const isSelected = m.id === selectedMood
               return (
@@ -66,14 +66,14 @@ export default function MoodTrackerView() {
                   aria-pressed={isSelected}
                   type="button"
                   onClick={() => setSelectedMood(m.id)}
-                  className={`flex flex-col items-center justify-center rounded-2xl border-2 p-3 transition active:scale-95 ${
+                  className={`flex flex-col items-center justify-center rounded-2xl border-2 p-4 sm:p-5 transition active:scale-95 ${
                     isSelected
                       ? `${m.color} shadow-md scale-105 font-bold`
                       : 'border-stone-200 bg-white text-stone-600 hover:border-amber-200 hover:bg-stone-50'
                   }`}
                 >
-                  <span className="text-3xl"><PixelIcon symbol={m.emoji} /></span>
-                  <span className="mt-1 text-xs">{m.label}</span>
+                  <span className="text-4xl"><PixelIcon symbol={m.emoji} /></span>
+                  <span className="mt-2 text-sm sm:text-base">{m.label}</span>
                 </button>
               )
             })}
@@ -81,17 +81,17 @@ export default function MoodTrackerView() {
         </div>
 
         {/* Motivational Quote Card */}
-        <div className="rounded-xl border border-amber-200 bg-amber-50/70 p-4 text-center">
-          <p className="text-sm font-semibold italic text-amber-900">"{activeMoodObj.quote}"</p>
+        <div className="rounded-xl border border-amber-200 bg-amber-50/70 p-5 text-center">
+          <p className="text-base sm:text-lg font-semibold italic text-amber-900">"{activeMoodObj.quote}"</p>
         </div>
 
         {/* Intensity Slider */}
-        <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
-          <div className="mb-2 flex items-center justify-between">
-            <label className="text-xs font-bold uppercase tracking-wider text-stone-600">
+        <div className="rounded-2xl border border-stone-200 bg-white p-6 sm:p-8 shadow-sm">
+          <div className="mb-3 flex items-center justify-between">
+            <label className="text-sm font-bold uppercase tracking-wider text-stone-600">
               Mood Intensity Level
             </label>
-            <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-black text-amber-800">
+            <span className="rounded-full bg-amber-100 px-3 py-1 text-sm font-black text-amber-800">
               {intensity} / 10
             </span>
           </div>
@@ -101,20 +101,20 @@ export default function MoodTrackerView() {
             max="10"
             value={intensity}
             onChange={(e) => setIntensity(Number(e.target.value))}
-            className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-stone-200 accent-amber-600"
+            className="h-3 w-full cursor-pointer appearance-none rounded-lg bg-stone-200 accent-amber-600"
           />
-          <div className="mt-1 flex justify-between text-[11px] text-stone-400">
+          <div className="mt-2 flex justify-between text-xs font-medium text-stone-400">
             <span>Mild (1)</span>
             <span>Balanced (5)</span>
             <span>Intense (10)</span>
           </div>
 
           {/* Reason Tags */}
-          <div className="mt-5 border-t border-stone-100 pt-4">
-            <label className="mb-2.5 block text-xs font-bold uppercase tracking-wider text-stone-600">
+          <div className="mt-6 border-t border-stone-100 pt-5">
+            <label className="mb-3 block text-sm font-bold uppercase tracking-wider text-stone-600">
               What contributed to this mood?
             </label>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-3">
               {CONTEXT_TAGS.map((tag) => {
                 const active = selectedTags.includes(tag)
                 return (
@@ -123,7 +123,7 @@ export default function MoodTrackerView() {
                     aria-pressed={active}
                     type="button"
                     onClick={() => toggleTag(tag)}
-                    className={`rounded-xl border px-3 py-1 text-xs font-medium transition ${
+                    className={`rounded-xl border px-4 py-2 text-sm sm:text-base font-medium transition ${
                       active
                         ? 'border-amber-500 bg-amber-500 text-white shadow-sm'
                         : 'border-stone-200 bg-stone-50 text-stone-600 hover:bg-stone-100'
@@ -137,25 +137,25 @@ export default function MoodTrackerView() {
           </div>
 
           {/* Notes */}
-          <div className="mt-4">
+          <div className="mt-5">
             <textarea
-              rows={2}
+              rows={3}
               value={note}
               onChange={(e) => setNote(e.target.value)}
               placeholder="Add any extra thoughts or context (optional)..."
-              className="w-full rounded-xl border border-stone-200 bg-stone-50/60 p-3 text-xs text-stone-800 placeholder-stone-400 focus:border-amber-400 focus:bg-white focus:outline-none"
+              className="w-full rounded-xl border border-stone-200 bg-stone-50/60 p-4 text-base text-stone-800 placeholder-stone-400 focus:border-amber-400 focus:bg-white focus:outline-none"
             />
           </div>
 
           {/* Save Button */}
-          <div className="mt-4 flex items-center justify-between">
+          <div className="mt-5 flex items-center justify-between">
             {savedSuccess ? (
-              <span className="text-xs font-bold text-emerald-600">✓ Mood Logged!</span>
+              <span className="text-sm font-bold text-emerald-600">✓ Mood Logged!</span>
             ) : <span />}
             <button
               type="button"
               onClick={handleSave}
-              className="rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 px-6 py-2 text-sm font-semibold text-white shadow-md transition hover:from-amber-700 hover:to-orange-700 active:scale-95"
+              className="rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 px-8 py-3 text-base sm:text-lg font-semibold text-white shadow-md transition hover:from-amber-700 hover:to-orange-700 active:scale-95"
             >
               Save Mood Entry
             </button>
@@ -165,10 +165,10 @@ export default function MoodTrackerView() {
 
       {/* Right Column: Mood History & Stats */}
       <div className="space-y-4 lg:col-span-5">
-        <h3 className="text-sm font-bold uppercase tracking-wider text-stone-600">Recent Mood Log ({logs.length})</h3>
-        <div className="max-h-[500px] space-y-3 overflow-y-auto pr-1">
+        <h3 className="text-base font-bold uppercase tracking-wider text-stone-600">Recent Mood Log ({logs.length})</h3>
+        <div className="max-h-[600px] space-y-4 overflow-y-auto pr-2">
           {logs.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-stone-300 p-8 text-center text-xs text-stone-400">
+            <div className="rounded-xl border border-dashed border-stone-300 p-10 text-center text-sm text-stone-400">
               No mood logs yet. Choose your mood and save your first log!
             </div>
           ) : (
@@ -177,29 +177,29 @@ export default function MoodTrackerView() {
               return (
                 <div
                   key={log.id || log.timestamp}
-                  className="rounded-xl border border-stone-200 bg-white p-4 shadow-sm transition hover:shadow"
+                  className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm transition hover:shadow"
                 >
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="text-2xl"><PixelIcon symbol={moodItem.emoji} /></span>
+                    <div className="flex items-center gap-3">
+                      <span className="text-3xl"><PixelIcon symbol={moodItem.emoji} /></span>
                       <div>
                         <div className="flex items-center gap-2">
-                          <span className="text-sm font-bold text-stone-800">{log.mood}</span>
-                          <span className="rounded-full bg-stone-100 px-2 py-0.2 text-[10px] font-bold text-stone-600">
+                          <span className="text-base font-bold text-stone-800">{log.mood}</span>
+                          <span className="rounded-full bg-stone-100 px-2.5 py-0.5 text-xs font-bold text-stone-600">
                             Level {log.rating}/10
                           </span>
                         </div>
-                        <span className="text-[10px] text-stone-400">{log.date}</span>
+                        <span className="text-xs text-stone-400">{log.date}</span>
                       </div>
                     </div>
                   </div>
 
-                  {log.note && <p className="mt-2 text-xs text-stone-600">{log.note}</p>}
+                  {log.note && <p className="mt-3 text-sm text-stone-600">{log.note}</p>}
 
                   {log.tags && log.tags.length > 0 && (
-                    <div className="mt-2.5 flex flex-wrap gap-1.5 border-t border-stone-100 pt-2">
+                    <div className="mt-3 flex flex-wrap gap-2 border-t border-stone-100 pt-3">
                       {log.tags.map((tag) => (
-                        <span key={tag} className="rounded bg-stone-100 px-1.5 py-0.5 text-[10px] text-stone-600">
+                        <span key={tag} className="rounded bg-stone-100 px-2 py-1 text-xs text-stone-600">
                           {tag}
                         </span>
                       ))}

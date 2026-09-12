@@ -65,24 +65,7 @@ const DEFAULT_DIARY_ENTRIES = [
   },
 ]
 
-const DEFAULT_MOOD_LOGS = [
-  {
-    id: 'mood-1',
-    date: new Date(Date.now() - 86400000).toISOString().split('T')[0],
-    mood: 'Relaxed',
-    rating: 7,
-    tags: ['Study', 'Room'],
-    note: 'Listened to the rain while working.',
-  },
-  {
-    id: 'mood-2',
-    date: new Date().toISOString().split('T')[0],
-    mood: 'Happy',
-    rating: 8,
-    tags: ['Break', 'Friends'],
-    note: 'Felt renewed after breathing exercise.',
-  },
-]
+const DEFAULT_MOOD_LOGS = []
 
 const DEFAULT_SETTINGS = {
   musicEnabled: true,

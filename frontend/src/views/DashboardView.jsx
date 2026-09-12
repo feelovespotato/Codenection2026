@@ -98,14 +98,6 @@ export default function DashboardView({ onOpenCalendar, onOpenBreathing }) {
         </div>
       </section>
 
-      {/* Developer/debug detail, tucked away instead of shown by default. */}
-      <details className="rounded-xl border border-stone-200 bg-white p-4 text-sm text-stone-700">
-        <summary className="cursor-pointer font-bold text-stone-600">✨ Behind the scenes (AI & data)</summary>
-        <p className="mt-2">{data.ai?.configured ? 'AI is configured with automatic provider fallback. Rules still validate every calendar move.' : 'Local rules and templates are active. Add provider keys on the backend to enable AI.'}</p>
-        {data.ai?.providers && <p className="mt-2 text-xs">{data.ai.providers.map(p => `${p.label}: ${{ ready: 'configured', missing_key: 'no key', cooldown: 'temporarily unavailable', paid_disabled: 'paid access disabled', disabled: 'disabled' }[p.state] || p.state}`).join(' · ')}</p>}
-        {data.ai?.unknownProviders?.length > 0 && <p className="mt-2 text-xs text-amber-800">Unknown provider names in configuration: {data.ai.unknownProviders.join(', ')}</p>}
-        <p className="mt-2 text-xs">Scheduling AI receives stress and category totals, plus proposed workload changes. Calendar titles and diary entries are not sent for scheduling. Boundary Guard sends only its draft context.</p>
-      </details>
 
       <TierTwoPanel />
     </>}

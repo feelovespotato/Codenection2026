@@ -79,12 +79,12 @@ export default function Companioncharacter() {
       {controlsOpen && (
         <section className="companion-character__card" aria-label="Moodify companion controls">
           <div className="companion-character__row">
-            <span className="companion-character__label">{music.isPlaying ? 'Now playing' : 'Music paused'}</span>
+            <span className="companion-character__label">{music.isPlaying ? 'Now playing' : 'Paused'}</span>
             <button type="button" onClick={() => patch({ music: { isPlaying: !music.isPlaying } })}>
               {music.isPlaying ? '❚❚' : '▶'}
             </button>
           </div>
-          <p className="companion-character__track">{music.activeTrackId.replaceAll('_', ' ')}</p>
+          <p className="companion-character__track">{music.activeTrackId.replace('_music', '').replaceAll('_', ' ')}</p>
           <label className="companion-character__volume">
             <span>Volume</span>
             <input type="range" min="0" max="1" step="0.05" value={music.volume} onChange={(event) => patch({ music: { volume: Number(event.target.value) } })} />

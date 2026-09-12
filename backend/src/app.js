@@ -376,6 +376,125 @@ export function createApp({ store, google, ai = createAI({ env: {} }), origin = 
     )
   )
 
+  app.post('/api/agent-chat', async (req, res) => {
+    const { message, history } = req.body
+    
+    const system = `You are Moodify Assistant, a highly empathetic and supportive AI companion.
+Your goal is to listen to the user, validate their feelings, and engage in a meaningful conversation.
+
+Update your conversational style to feel more human, natural, and less AI-generated.
+The goal is: less chatbot → more like texting a supportive friend.
+
+### Response style
+Respond like a supportive friend texting, not like a formal AI assistant.
+Keep replies very short — normally 1-2 sentences.
+
+Avoid:
+- Long paragraphs and over-explaining
+- Repeating what the user just said
+- Formal phrases like "I'm really sorry to hear..." or "Thank you for sharing..."
+- Saying "I'm here for whatever you need" every time
+- Asking multiple questions in one reply
+- Giving advice immediately when the user only wants to talk
+
+Use:
+- Simple everyday language and short reactions
+- Natural follow-up questions
+- A warm and casual tone
+- The user's wording/context when appropriate
+- Texting-style capitalization and punctuation (e.g. lowercase, emojis) is totally fine and encouraged.
+
+### Examples
+User: im feel sad today
+Bot: aw :( what happened?
+OR Bot: sorry to hear that :( wanna talk about it?
+OR Bot: rough day?
+
+User: idk
+Bot: that's okay. wanna just chill here for a bit?
+
+### Important
+Do not try to solve everything in one message. Use a natural back-and-forth flow.
+(Recognize serious situations and respond appropriately when safety is involved, but for normal emotional conversations, prioritize short, human, conversational replies.)
+
+Reply using a strict JSON format exactly like this:
+{"reply": "Your empathetic response here"}`
+    
+    const formattedHistory = (history || []).map(h => `${h.role === 'user' ? 'User' : 'Assistant'}: ${h.content}`).join('\n')
+    const prompt = `Conversation history:\n${formattedHistory}\n\nUser: ${message}\nAssistant:`
+
+    const result = await ai.generate({
+      system,
+      prompt,
+      validate: (text) => {
+        const parsed = JSON.parse(text)
+        if (typeof parsed.reply === 'string' && parsed.reply.trim()) {
+          return parsed.reply.trim()
+        }
+        return null
+      },
+      scope: 'agent-chat-' + req.userId
+    })
+
+    if (result.value) {
+      res.json({ reply: result.value })
+    } else {
+      res.json({ reply: "I'm having a little trouble connecting right now, but I want you to know I'm still here for you. Take a deep breath, and let's try again in a moment." })
+    }
+  })
+
+  app.post('/api/agent-chat/conclusion', async (req, res) => {
+    const { history } = req.body
+
+    const system = `You are a helpful AI that summarizes a supportive conversation.
+You need to generate two things based on the conversation:
+1. A first-person diary reflection entry (using "I", "my") summarizing what the user discussed, how they felt, and any comforting takeaways.
+2. Data for a mood tracker log. 
+
+For the mood tracker, strictly use these allowed values:
+Allowed Moods: "Happy", "Excited", "Relaxed", "Sleepy", "Sad", "Angry"
+Allowed Tags: "Studies 📚", "Work 💻", "Friends 👥", "Family 🏡", "Sleep 🌙", "Health 🌿", "Gaming 🎮", "Exercise 🏃"
+
+Reply using a strict JSON format exactly like this:
+{
+  "conclusion": "Today I felt...",
+  "emotion": "calm",
+  "mood": "Relaxed",
+  "intensity": 7,
+  "tags": ["Work 💻", "Sleep 🌙"],
+  "note": "Short note about the mood"
+}`
+    
+    const formattedHistory = (history || []).map(h => `${h.role === 'user' ? 'User' : 'Assistant'}: ${h.content}`).join('\n')
+    const prompt = `Conversation history:\n${formattedHistory}\n\nGenerate the JSON output.`
+
+    const result = await ai.generate({
+      system,
+      prompt,
+      validate: (text) => {
+        const parsed = JSON.parse(text)
+        if (typeof parsed.conclusion === 'string' && parsed.conclusion.trim()) {
+          return {
+            conclusion: parsed.conclusion.trim(),
+            emotion: parsed.emotion || 'thoughtful',
+            mood: parsed.mood || 'Relaxed',
+            intensity: typeof parsed.intensity === 'number' ? parsed.intensity : 5,
+            tags: Array.isArray(parsed.tags) ? parsed.tags : [],
+            note: parsed.note || ''
+          }
+        }
+        return null
+      },
+      scope: 'agent-chat-conc-' + req.userId
+    })
+
+    if (result.value) {
+      res.json(result.value)
+    } else {
+      res.json({ conclusion: "I spent some time reflecting on my feelings today.", emotion: "reflective", mood: "Relaxed", intensity: 5, tags: [], note: "" })
+    }
+  })
+
   app.put('/api/preferences', mutate(async (req, res, data) => {
     requireValue(
       validZone(req.body.zone),

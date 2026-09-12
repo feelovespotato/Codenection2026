@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import PixelIcon from '../components/PixelIcon.jsx'
 import { sendAgentMessage } from '../services/agent.js'
+import { api } from '../services/api.js'
+import { StorageService } from '../services/storage.js'
 
 const SpeechRecognitionApi = typeof window !== 'undefined'
   ? (window.SpeechRecognition || window.webkitSpeechRecognition)
@@ -25,6 +27,49 @@ export default function AgentChatView() {
   const recognitionRef = useRef(null)
   const bottomRef = useRef(null)
   const inputRef = useRef(null)
+  const messagesRef = useRef(messages)
+
+  useEffect(() => {
+    messagesRef.current = messages
+  }, [messages])
+
+  useEffect(() => {
+    return () => {
+      const history = messagesRef.current
+      if (history.length > 2) {
+        api('/agent-chat/conclusion', {
+          method: 'POST',
+          body: { history: history.map(m => ({ role: m.role, content: m.text })) },
+        })
+          .then((data) => {
+            const now = new Date()
+            
+            // Save Diary Entry
+            StorageService.saveDiaryEntry({
+              title: 'Chat Reflection',
+              content: data.conclusion,
+              emotion: data.emotion || 'thoughtful',
+              date: now.toISOString(),
+            })
+            
+            // Save Mood Log
+            if (data.mood) {
+              StorageService.saveMoodLog({
+                mood: data.mood,
+                rating: data.intensity || 5,
+                tags: data.tags || [],
+                note: data.note || 'Generated from chat session.',
+                date: now.toISOString().split('T')[0],
+                timestamp: now.toISOString(),
+              })
+            }
+          })
+          .catch((err) => {
+            console.error('Failed to save chat conclusion:', err)
+          })
+      }
+    }
+  }, [])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -114,15 +159,15 @@ export default function AgentChatView() {
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
       {/* Side column: the companion, drawn as though she's sitting and listening */}
       <div className="order-2 lg:order-1 lg:col-span-4">
-        <div className="flex flex-col items-center rounded-2xl border border-stone-200 bg-white p-4 text-center shadow-sm lg:sticky lg:top-0">
+        <div className="flex flex-col items-center rounded-2xl border border-stone-200 bg-white p-6 text-center shadow-sm lg:sticky lg:top-0">
           <img
             src="/companion/girl-sitting.png"
             alt="Your Moodify companion, sitting cross-legged and listening"
             className="w-40 select-none sm:w-48 lg:w-full lg:max-w-[220px]"
             draggable="false"
           />
-          <p className="mt-3 text-sm font-bold text-stone-800">Moodify is listening</p>
-          <p className="mt-1 text-xs leading-relaxed text-stone-500">
+          <p className="mt-4 text-base sm:text-lg font-bold text-stone-800">Moodify is listening</p>
+          <p className="mt-1.5 text-sm leading-relaxed text-stone-500">
             Talk it through out loud or by typing.
           </p>
         </div>
@@ -130,14 +175,14 @@ export default function AgentChatView() {
 
       {/* Main column: the conversation */}
       <div className="order-1 flex flex-col lg:order-2 lg:col-span-8">
-        <div className="flex h-[460px] flex-col rounded-2xl border border-stone-200 bg-stone-50/50 shadow-inner overflow-hidden">
-          <div className="flex-1 overflow-y-auto p-4 space-y-3">
+        <div className="flex h-[600px] flex-col rounded-2xl border border-stone-200 bg-stone-50/50 shadow-inner overflow-hidden">
+          <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-4">
             {messages.map((message, index) => {
               const isUser = message.role === 'user'
               return (
                 <div key={index} className={`flex flex-col ${isUser ? 'items-end' : 'items-start'} animate-in fade-in duration-200`}>
                   <div
-                    className={`max-w-[85%] rounded-2xl p-3.5 text-xs leading-relaxed shadow-sm ${
+                    className={`max-w-[85%] rounded-2xl p-4 sm:p-5 text-base leading-relaxed shadow-sm ${
                       isUser
                         ? 'bg-amber-500 text-white rounded-br-xs'
                         : 'bg-white border border-stone-200 text-stone-800 rounded-bl-xs'
@@ -145,15 +190,17 @@ export default function AgentChatView() {
                   >
                     <p className="whitespace-pre-line font-medium">{message.text}</p>
                   </div>
-                  <span className="mt-1 px-1 text-[10px] text-stone-400">{message.time}</span>
+                  <span className="mt-1 px-2 text-xs text-stone-400">{message.time}</span>
                 </div>
               )
             })}
 
             {sending && (
               <div className="flex flex-col items-start">
-                <div className="max-w-[85%] rounded-2xl border border-stone-200 bg-white p-3.5 text-xs text-stone-500 shadow-sm rounded-bl-xs">
-                  Moodify is thinking…
+                <div className="max-w-[85%] flex items-center gap-2 rounded-2xl border border-stone-200 bg-white px-5 py-5 shadow-sm rounded-bl-xs">
+                  <span className="h-2 w-2 rounded-full bg-stone-400 animate-bounce" style={{ animationDelay: '0ms' }} />
+                  <span className="h-2 w-2 rounded-full bg-stone-400 animate-bounce" style={{ animationDelay: '150ms' }} />
+                  <span className="h-2 w-2 rounded-full bg-stone-400 animate-bounce" style={{ animationDelay: '300ms' }} />
                 </div>
               </div>
             )}
@@ -161,12 +208,12 @@ export default function AgentChatView() {
           </div>
 
           {(sendError || voiceError) && (
-            <div role="alert" className="border-t border-rose-200 bg-rose-50 px-4 py-2 text-xs text-rose-900">
+            <div role="alert" className="border-t border-rose-200 bg-rose-50 px-5 py-3 text-sm text-rose-900">
               {sendError || voiceError}
             </div>
           )}
 
-          <form onSubmit={handleSend} className="flex items-center gap-2 border-t border-stone-200 bg-white p-3">
+          <form onSubmit={handleSend} className="flex items-center gap-3 border-t border-stone-200 bg-white p-4">
             {SpeechRecognitionApi && (
               <button
                 type="button"
@@ -174,7 +221,7 @@ export default function AgentChatView() {
                 aria-pressed={listening}
                 aria-label={listening ? 'Stop voice input' : 'Speak your message'}
                 title={listening ? 'Stop voice input' : 'Speak your message'}
-                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full border text-base ${
+                className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full border text-xl ${
                   listening ? 'border-rose-400 bg-rose-100 text-rose-700 animate-pulse' : 'border-stone-200 bg-stone-50 text-stone-600'
                 }`}
               >
@@ -188,12 +235,12 @@ export default function AgentChatView() {
               onChange={(event) => setInput(event.target.value)}
               placeholder={listening ? 'Listening…' : 'Type how you feel, or ask for help…'}
               aria-label="Message to your Moodify companion"
-              className="flex-1 rounded-lg border border-stone-200 bg-stone-50/50 px-3.5 py-2 text-sm text-stone-800 placeholder-stone-400 focus:border-amber-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-200/50"
+              className="flex-1 rounded-lg border border-stone-200 bg-stone-50/50 px-4 py-3 text-lg text-stone-800 placeholder-stone-400 focus:border-amber-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-200/50"
             />
             <button
               type="submit"
               disabled={!input.trim() || sending}
-              className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 px-4 py-2 text-sm font-semibold text-white shadow-md transition disabled:opacity-50 active:scale-95"
+              className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 px-5 py-3 text-base sm:text-lg font-semibold text-white shadow-md transition disabled:opacity-50 active:scale-95"
             >
               Send
             </button>
@@ -201,7 +248,7 @@ export default function AgentChatView() {
         </div>
 
         {!SpeechRecognitionApi && (
-          <p className="mt-2 text-[11px] text-stone-400">Voice input isn't supported in this browser — typing still works.</p>
+          <p className="mt-2 text-xs text-stone-400">Voice input isn't supported in this browser — typing still works.</p>
         )}
       </div>
     </div>

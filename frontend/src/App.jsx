@@ -262,7 +262,7 @@ export default function App() {
           subtitle="Express your day with prompts, live sentiment analysis & word tracking"
           icon="📖"
           onClose={closeModal}
-          maxWidth="max-w-5xl"
+          maxWidth="max-w-6xl"
         >
           <DiaryView />
         </Modal>
@@ -274,7 +274,7 @@ export default function App() {
           subtitle="Record emotional state, intensity, contributing factors & mindful quotes"
           icon="😄"
           onClose={closeModal}
-          maxWidth="max-w-4xl"
+          maxWidth="max-w-5xl"
         >
           <MoodTrackerView />
         </Modal>
@@ -310,7 +310,7 @@ export default function App() {
           subtitle="Ground-truth 1–5 daily check-in or comprehensive 10-question chat survey"
           icon="📱"
           onClose={closeModal}
-          maxWidth="max-w-2xl"
+          maxWidth="max-w-3xl"
         >
           <StressQuizView onCheckInComplete={refreshCapacity} />
         </Modal>
@@ -361,7 +361,7 @@ export default function App() {
           subtitle="Type or speak to your AI assistant — a space to think out loud"
           icon="💬"
           onClose={closeModal}
-          maxWidth="max-w-4xl"
+          maxWidth="max-w-5xl"
         >
           <AgentChatView />
         </Modal>

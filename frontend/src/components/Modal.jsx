@@ -39,25 +39,25 @@ export default function Modal({ title, subtitle, icon, onClose, children, maxWid
         className={`pixel-window relative flex max-h-[92vh] w-full ${maxWidth} flex-col overflow-hidden rounded-2xl border border-white/20 bg-[#fdfbf7] text-[#2c3e50] shadow-2xl animate-in zoom-in-95 duration-200`}
       >
         {/* Header */}
-        <div className="pixel-window-header flex items-center justify-between gap-3 border-b border-[#e9dfd1] bg-[#faf5ee] px-4 py-4 sm:px-6">
-          <div className="flex min-w-0 items-center gap-3">
+        <div className="pixel-window-header flex items-center justify-between gap-4 border-b border-[#e9dfd1] bg-[#faf5ee] px-6 py-5 sm:px-8">
+          <div className="flex min-w-0 items-center gap-4">
             {icon && (
-              <span aria-hidden="true" className="pixel-window-icon hidden h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-100/80 text-xl shadow-inner sm:flex">
+              <span aria-hidden="true" className="pixel-window-icon hidden h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-amber-100/80 text-3xl shadow-inner sm:flex">
                 <PixelIcon symbol={icon} />
               </span>
             )}
             <div>
-              <h2 id={titleId} className="text-2xl font-bold tracking-tight text-[#2d3748] sm:text-3xl">{title}</h2>
+              <h2 id={titleId} className="text-3xl font-bold tracking-tight text-[#2d3748] sm:text-4xl">{title}</h2>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close modal and return to room"
-            className="flex min-h-10 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl border border-[#e2d5c3] bg-white px-3 py-1.5 text-xs font-semibold text-[#5a4a42] shadow-sm transition hover:bg-[#f3ece2] hover:text-black"
+            className="flex min-h-12 shrink-0 items-center gap-2 whitespace-nowrap rounded-xl border border-[#e2d5c3] bg-white px-5 py-2 text-sm sm:text-base font-semibold text-[#5a4a42] shadow-sm transition hover:bg-[#f3ece2] hover:text-black"
           >
             <span className="hidden sm:inline">Return to Room</span>
-            <span className="text-base leading-none"><PixelIcon symbol="✕" /></span>
+            <span className="text-xl leading-none"><PixelIcon symbol="✕" /></span>
           </button>
         </div>
 

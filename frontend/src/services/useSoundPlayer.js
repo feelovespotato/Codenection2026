@@ -26,8 +26,8 @@ export function useSoundPlayer(settings) {
     const publish = async () => {
       if (!alive || player.isApplyingCompanionState || publishing) return
       publishing = true
-      const { activeTrackId, isPlaying, volume } = player.getSnapshot()
-      try { await updateCompanionState({ music: { activeTrackId, isPlaying, volume } }) } catch { /* The normal player still works if the local API is offline. */ }
+      const { activeTrackId, isPlaying, isStarting, volume } = player.getSnapshot()
+      try { await updateCompanionState({ music: { activeTrackId, isPlaying: isPlaying || isStarting, volume } }) } catch { /* The normal player still works if the local API is offline. */ }
       finally { publishing = false }
     }
     const sync = async () => {
@@ -35,8 +35,9 @@ export function useSoundPlayer(settings) {
         const shared = await readCompanionState()
         if (!alive || player.isApplyingCompanionState) return
         const current = player.getSnapshot()
+        const effectivelyPlaying = current.isPlaying || current.isStarting
         const music = shared.music
-        if (music && (music.activeTrackId !== current.activeTrackId || music.isPlaying !== current.isPlaying || music.volume !== current.volume)) await player.applyCompanionState(music)
+        if (music && (music.activeTrackId !== current.activeTrackId || music.isPlaying !== effectivelyPlaying || music.volume !== current.volume)) await player.applyCompanionState(music)
       } catch { /* Retry on the next polling interval. */ }
     }
     const unsubscribe = player.subscribe(publish)

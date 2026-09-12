@@ -41,8 +41,14 @@ export class SoundPlayer {
       }
       if (this.audio) this.audio.volume = next.volume
       if (shouldPlay && this.audio) {
-        try { await this.audio.play(); this.update({ activeTrackId: track.id, isPlaying: true, isStarting: false, volume: next.volume, error: '' }) }
-        catch { this.update({ activeTrackId: track.id, isPlaying: false, isStarting: false, volume: next.volume }) }
+        try {
+          await this.audio.play()
+          this.update({ activeTrackId: track.id, isPlaying: true, isStarting: false, volume: next.volume, error: '' })
+          this.syncBackground()
+        } catch {
+          this.update({ activeTrackId: track.id, isPlaying: false, isStarting: false, volume: next.volume })
+          this.syncBackground()
+        }
       } else {
         this.audio?.pause()
         this.update({ activeTrackId: track.id, isPlaying: false, isStarting: false, volume: next.volume })
