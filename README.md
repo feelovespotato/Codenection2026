@@ -432,7 +432,7 @@ When testing locally, ensure your Google Cloud Console OAuth settings allow `htt
 |---|---|---|
 | Frontend | Vercel (`moodify-frontend-kappa`) | `localhost:5173` |
 | Backend | Vercel (`moodify-backend-navy`) | `localhost:3001` |
-| Database |  PostgreSQL / Neon |
+| Database |  PostgreSQL / Neon | PostgreSQL / Neon |
 | Google OAuth | Production callback URL | Local callback URL |
 | Best for | Judge demo / public access | Development / testing |
 
