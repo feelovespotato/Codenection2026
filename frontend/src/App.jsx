@@ -101,14 +101,41 @@ export default function App() {
     return 'bg-emerald-500/90 text-white border-emerald-400'
   }
 
+  const [showDownloadBanner, setShowDownloadBanner] = useState(() => !navigator.userAgent.includes('Electron') && !sessionStorage.getItem('dismissedDownload'))
   const [isNavHidden, setIsNavHidden] = useState(false)
 
   return (
     <div className="pixel-ui relative h-screen w-screen overflow-hidden bg-[#0d0b12] text-[#fff8ef]" data-scene={activeScene}>
+
+      {/* Desktop Companion Download Banner */}
+      {showDownloadBanner && (
+        <div className="pointer-events-auto absolute inset-x-0 top-0 z-50 flex items-center justify-between gap-3 bg-gradient-to-r from-amber-800/95 to-orange-700/95 px-4 py-2 text-sm text-white shadow-lg backdrop-blur-sm">
+          <div className="flex items-center gap-2">
+            <span className="text-lg">🐱</span>
+            <span className="font-semibold">Get the Desktop Companion — your pixel girl lives on your screen!</span>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <a
+              href="https://github.com/feelovespotato/Codenection2026/releases/latest/download/Moodify.Companion.Setup.1.0.0.exe"
+              download
+              className="rounded-lg bg-white px-3 py-1 text-sm font-bold text-amber-800 hover:bg-amber-50 transition"
+            >
+              ⬇ Download for Windows
+            </a>
+            <button
+              type="button"
+              onClick={() => { sessionStorage.setItem('dismissedDownload', '1'); setShowDownloadBanner(false) }}
+              className="rounded px-2 py-1 text-white/70 hover:text-white transition"
+              aria-label="Dismiss"
+            >✕</button>
+          </div>
+        </div>
+      )}
+
       {/* Floating Top Wellness Navigation Bar — single-line strip pinned to the very top */}
       {activeScene === 'main' && (
         <>
-          <header className="pixel-hud pointer-events-none absolute inset-x-0 top-0 z-40 flex items-center gap-2 p-2 sm:gap-3 sm:p-3 sm:px-6">
+          <header className={`pixel-hud pointer-events-none absolute inset-x-0 z-40 flex items-center gap-2 p-2 sm:gap-3 sm:p-3 sm:px-6 ${showDownloadBanner ? 'top-10' : 'top-0'}`}>
             {/* Brand & Room Title */}
             <div className="pixel-brand pointer-events-auto flex shrink-0 items-center gap-2 rounded-2xl border border-white/15 bg-black/50 px-4 py-2 backdrop-blur-md shadow-lg">
               <span className="text-xl"><PixelIcon symbol="🌿" /></span>
