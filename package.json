@@ -26,7 +26,7 @@
     "appId": "com.moodify.companion",
     "productName": "Moodify Companion",
     "directories": {
-      "output": "dist-electron"
+      "output": "dist-electron-new"
     },
     "files": [
       "companion/**/*",
