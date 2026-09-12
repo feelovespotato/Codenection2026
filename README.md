@@ -80,7 +80,7 @@ Table of every distinct idea generated, with why each was kept or dropped, order
 
 ## 2.2 Ideation Boards
 
-![Mindmap](docs/ideation/mindmap.jpeg)
+![Mindmap](docs/mindmap.jpeg)
 
 ## 2.3 Mentor Consultation
 
@@ -91,29 +91,22 @@ Table of every distinct idea generated, with why each was kept or dropped, order
 
 # 3. Design & Prototype
 
-**UI Prototype:** [Public Link]
-
-Recommended 4–8 core screens to embed in the final README:
+**UI Prototype:** 
 
 | Key screen | What the interaction demonstrates |
 | --- | --- |
-| `docs/screens/dashboard.png` | Capacity, workload, mood/check-in, and immediate status at a glance. |
-| `docs/screens/calendar.png` | Real events, categories, flexible/fixed commitments, and calendar management. |
-| `docs/screens/google-sync.png` | Google connection/sync and the distinction between Moodify data and Google data. |
-| `docs/screens/ai-chat.png` | Human-readable AI conversation with text/voice input. |
-| `docs/screens/ai-planning.png` | AI gathers missing planning details, proposes a calendar action, then asks where the user wants it saved. |
-| `docs/screens/load-shedder.png` | Before/after workload impact and controlled approval for a safer move. |
-| `docs/screens/recovery.png` | Recovery recommendation based on available time and workload context. |
-| `docs/screens/diary-mood.png` | Reflection loop connecting conversations to diary/mood tracking while keeping dedicated planning conversations separate. |
-
-Example image format:
-
-```markdown
-![Moodify Dashboard](docs/screens/dashboard.png)
-*Dashboard — The student can immediately see capacity, workload mix, and the next useful action.*
-```
-
-For the final submission, ensure the prototype link opens in an incognito window and the screenshots cover the complete user journey rather than isolated UI fragments.
+| ![main_page](docs/UI/main_page.png) | An interactive pixel-art space that makes wellness feel like play, replacing clinical menus with clickable objects. |
+| ![dashboard](docs/UI/dashboard.png) | Capacity, workload, mood/check-in, and immediate status at a glance. |
+| ![calendar](docs/UI/calendar.png) | Uses your schedule as an objective workload baseline, organising flexible and fixed events to help safely rebalance overloaded days. |
+| ![Google Sync](docs/UI/google_sync.png) | Connects your existing life securely. Moodify analyses your real events while keeping you in full control of any schedule changes. |
+| ![chat_room](docs/UI/chat_room.png) | A lightweight multiplayer lounge offering a supportive, low-pressure space for students to connect and reduce isolation. |
+| ![ai_chat](docs/UI/ai_chat.png) | A conversational companion to think out loud, helping translate feelings into practical recovery. |
+| ![ai_chat_to_schedule](docs/UI/ai_schedule.png) | Turns natural conversation into proposed calendar events. The AI structures your plan, but you always control where it gets saved. |
+| ![ambient_music](docs/UI/ambient_music.png) | Built-in background audio and focus timers to tune out distractions and sustain a healthy work rhythm. |
+| ![breathe](docs/UI/breathe.png) | Integrated breathing exercises that provide immediate, in-the-moment recovery to help lower stress without leaving the app. |
+| ![mood_tracker](docs/UI/mood_tracker.png) | Captures the subjective side of stress—emotions and triggers—to measure how a schedule actually feels. |
+| ![diary](docs/UI/diary.png) | Reflection loop connecting conversations to diary/mood tracking while keeping dedicated planning conversations separate. |
+| ![stress](docs/UI/stress.png) | A quick 1–5 daily check-in that measures perceived heaviness, combining subjective feelings with objective calendar load. |
 
 # 4. What Makes It Different
 
@@ -156,7 +149,7 @@ The standout product idea is the **closed-loop relationship between detection an
 The current source also includes several feasibility safeguards: bounded AI request timeouts, provider cooldown/fallback behavior, explicit parsing/validation of AI output, Google token encryption, session handling, calendar conflict checks, and separate user approval before supported write actions. Core load calculations and scheduling constraints remain deterministic rather than depending entirely on an LLM, which makes the most important workload logic easier to explain and test.
 
 **System architecture diagram**
-![Moodify Dashboard](docs/system_architecture.png)
+![Moodify system_architecture](docs/system_architecture.png)
 
 ### 1. Browser (Client Layer)
 
