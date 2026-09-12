@@ -116,7 +116,7 @@ export default function App() {
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <a
-              href="https://github.com/feelovespotato/Codenection2026/releases/latest/download/Moodify.Companion.Setup.1.0.0.exe"
+              href="https://github.com/Gohpeijia/moodify/releases/latest/download/Moodify.Companion.Setup.1.0.0.exe"
               download
               className="rounded-lg bg-white px-3 py-1 text-sm font-bold text-amber-800 hover:bg-amber-50 transition"
             >
