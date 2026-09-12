@@ -11,6 +11,7 @@ import DashboardView from './views/DashboardView.jsx'
 import SoundView from './views/SoundView.jsx'
 import { useSoundPlayer } from './services/useSoundPlayer.js'
 import InstructionsView from './views/InstructionsView.jsx'
+import AgentChatView from './views/AgentChatView.jsx'
 import { StorageService } from './services/storage.js'
 import RoomMap from './social/RoomMap.jsx'
 import SocialRoom from './social/SocialRoom.jsx'
@@ -69,6 +70,10 @@ export default function App() {
     if (feature === 'radio' || feature === 'radio-play') {
       setActiveModal('sound')
     }
+  }, [])
+
+  const handleCompanion = useCallback(() => {
+    setActiveModal('agent-chat')
   }, [])
 
   useEffect(() => {
@@ -231,6 +236,7 @@ export default function App() {
           onActivity={handleActivity}
           onFeature={handleFeature}
           onHotspot={handleHotspot}
+          onCompanion={handleCompanion}
           musicEnabled={musicSettings.musicEnabled}
           musicVolume={musicSettings.musicVolume}
           onMusicEnabledChange={setMusicEnabled}
@@ -346,6 +352,18 @@ export default function App() {
           maxWidth="max-w-3xl"
         >
           <InstructionsView />
+        </Modal>
+      )}
+
+      {activeModal === 'agent-chat' && (
+        <Modal
+          title="Moodify Assistant"
+          subtitle="Type or speak to your AI assistant — a space to think out loud"
+          icon="💬"
+          onClose={closeModal}
+          maxWidth="max-w-4xl"
+        >
+          <AgentChatView />
         </Modal>
       )}
     </div>

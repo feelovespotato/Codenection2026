@@ -5,6 +5,7 @@ export default function MainGamePage({
   onActivity,
   onHotspot,
   onFeature,
+  onCompanion,
   onSettings,
   musicEnabled,
   musicVolume,
@@ -24,6 +25,7 @@ export default function MainGamePage({
       onActivity,
       onHotspot,
       onFeature,
+      onCompanion,
       onSettings: () => {
         setSettingsOpen((open) => !open)
         onSettings?.()
@@ -46,7 +48,7 @@ export default function MainGamePage({
       game?.destroy()
       gameRef.current = null
     }
-  }, [onActivity, onFeature, onHotspot, onSettings])
+  }, [onActivity, onFeature, onHotspot, onCompanion, onSettings])
 
   return (
     <main className="main-room fixed inset-0 flex h-svh w-screen items-center justify-center overflow-hidden bg-[#0d0b12]">

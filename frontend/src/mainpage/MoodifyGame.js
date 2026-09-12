@@ -5,6 +5,7 @@ import {
   Container,
   Graphics,
   Sprite,
+  Text,
   Texture,
   Rectangle,
 } from 'pixi.js'
@@ -32,7 +33,7 @@ const assetSources = {
   rain: '/moodify/raindrop.png',
   settings: '/moodify/pixel-settings.svg',
   tv: '/moodify/tv-interface.png',
-  
+
   plant: '/moodify/plant-interface.png',
   cancel: '/moodify/cancel.png',
   waterButton: '/moodify/water-button.png',
@@ -48,7 +49,7 @@ function clickable(sprite, onPress, label) {
   sprite.eventMode = 'static'
   sprite.cursor = 'pointer'
   sprite.label = label
-  
+
   sprite.on('pointerover', () => {
     sprite.y -= 4 // Float effect
   })
@@ -66,6 +67,67 @@ function playAnimation(sprite, textures, animationSpeed) {
   sprite.animationSpeed = animationSpeed
   sprite.loop = true
   sprite.gotoAndPlay(0)
+}
+
+// Feature icons only bobbed on hover, which is easy to miss. This draws a
+// golden highlight ring plus a name tag above whatever's hovered, shared by
+// icons, the settings gear, the walkable companion, and the room hotspots
+// (TV / radio / plant) so every clickable thing in the room says so clearly.
+function createHoverDecor(scene, tooltipLayer, { x, y, width, height, label, haloPadding = 8, insertBelow }) {
+  const halo = new Graphics()
+    .roundRect(-haloPadding, -haloPadding, width + haloPadding * 2, height + haloPadding * 2, 10)
+    .fill({ color: 0xf3d17a, alpha: 0.55 })
+    .stroke({ width: 3, color: 0x392c32, alpha: 0.9 })
+  halo.position.set(x, y)
+  halo.visible = false
+  if (insertBelow) scene.addChildAt(halo, scene.getChildIndex(insertBelow))
+  else scene.addChild(halo)
+
+  const text = new Text({
+    text: label,
+    style: { fontFamily: "'Pixelify Sans', 'Courier New', monospace", fontSize: 20, fill: 0x392c32 },
+  })
+  const padX = 10
+  const padY = 6
+  const tagWidth = text.width + padX * 2
+  const tagHeight = text.height + padY * 2
+  const tag = new Graphics()
+    .roundRect(0, 0, tagWidth, tagHeight, 6)
+    .fill({ color: 0xfff4dc })
+    .stroke({ width: 3, color: 0x392c32 })
+  text.position.set(padX, padY)
+  const tooltip = new Container()
+  tooltip.addChild(tag, text)
+  tooltip.position.set(x + width / 2 - tagWidth / 2, y - tagHeight - 14)
+  tooltip.visible = false
+  tooltipLayer.addChild(tooltip)
+
+  return {
+    setVisible(visible) {
+      halo.visible = visible
+      tooltip.visible = visible
+    },
+    reposition(nextX, nextY) {
+      halo.position.set(nextX, nextY)
+      tooltip.position.set(nextX + width / 2 - tagWidth / 2, nextY - tagHeight - 14)
+    },
+  }
+}
+
+function addInteractiveSprite(scene, tooltipLayer, texture, { x, y, width, height, label, onPress, haloPadding = 8 }) {
+  const sprite = new Sprite(texture)
+  sprite.position.set(x, y)
+  if (width) sprite.width = width
+  if (height) sprite.height = height
+
+  const decor = createHoverDecor(scene, tooltipLayer, { x, y, width: sprite.width, height: sprite.height, label, haloPadding })
+
+  clickable(sprite, onPress, label)
+  sprite.on('pointerover', () => decor.setVisible(true))
+  sprite.on('pointerout', () => decor.setVisible(false))
+
+  scene.addChild(sprite)
+  return sprite
 }
 
 export async function createMoodifyGame(canvasHost, callbacks = {}) {
@@ -119,11 +181,16 @@ export async function createMoodifyGame(canvasHost, callbacks = {}) {
   room.height = VIRTUAL_HEIGHT
   scene.addChild(room)
 
+  // Rendered last (see bottom of setup) so tooltips float above every sprite.
+  const tooltipLayer = new Container()
+
   const addIcon = (icon) => {
-    const sprite = new Sprite(iconTextures[icon.id])
-    sprite.position.set(icon.x, icon.y)
-    clickable(sprite, () => callbacks.onActivity?.(icon.id, icon), icon.label)
-    scene.addChild(sprite)
+    addInteractiveSprite(scene, tooltipLayer, iconTextures[icon.id], {
+      x: icon.x,
+      y: icon.y,
+      label: icon.label,
+      onPress: () => callbacks.onActivity?.(icon.id, icon),
+    })
   }
   ICONS.filter((icon) => icon.layer === 'behind').forEach(addIcon)
 
@@ -167,17 +234,44 @@ export async function createMoodifyGame(canvasHost, callbacks = {}) {
   girl.animationSpeed = 0.11
   girl.loop = true
   girl.play()
+  clickable(girl, () => callbacks.onCompanion?.(), 'Chat with your Moodify companion')
   scene.addChild(girl)
   let girlAnimation = 'idle'
 
+  // The companion's sprite bounding box has a lot of empty transparent
+  // padding around her actual body, so the halo/tooltip use a smaller
+  // "hitbox" sized and centered relative to her sprite rather than her
+  // full width/height. She also walks, so her highlight/tooltip must be
+  // repositioned every frame to track girl.x (see ticker below) — not just
+  // set once here.
+  const GIRL_HALO_WIDTH = girl.width * 0.55
+  const GIRL_HALO_HEIGHT = girl.height * 0.95
+  const girlHaloX = () => girl.x - GIRL_HALO_WIDTH / 2
+  const girlHaloY = () => FEMALE_Y + (girl.height - GIRL_HALO_HEIGHT)
+  const girlHover = createHoverDecor(scene, tooltipLayer, {
+    x: girlHaloX(),
+    y: girlHaloY(),
+    width: GIRL_HALO_WIDTH,
+    height: GIRL_HALO_HEIGHT,
+    label: 'Chat with Moodify',
+    haloPadding: 6,
+  })
+  girl.on('pointerover', () => girlHover.setVisible(true))
+  girl.on('pointerout', () => girlHover.setVisible(false))
+
   ICONS.filter((icon) => icon.layer === 'front').forEach(addIcon)
 
-  const settings = new Sprite(textures.settings)
-  settings.position.set(VIRTUAL_WIDTH - 100, 80)
-  settings.width = 80
-  settings.height = 80
-  clickable(settings, () => callbacks.onSettings?.(), 'Settings')
-  scene.addChild(settings)
+  addInteractiveSprite(scene, tooltipLayer, textures.settings, {
+    x: VIRTUAL_WIDTH - 100,
+    y: 80,
+    width: 80,
+    height: 80,
+    label: 'Settings',
+    onPress: () => callbacks.onSettings?.(),
+  })
+
+  // Added last so hover tooltips render above every other sprite in the room.
+  scene.addChild(tooltipLayer)
 
   let activeOverlay = null
   let wateringAnimation = null
@@ -201,88 +295,100 @@ export async function createMoodifyGame(canvasHost, callbacks = {}) {
     activeOverlay = null
   }
   const openOverlay = (type) => {
-  stopWatering()
-  overlay.removeChildren()
+    stopWatering()
+    overlay.removeChildren()
 
-  const background = new Sprite(textures[type])
-  background.width = VIRTUAL_WIDTH
-  background.height = VIRTUAL_HEIGHT
-  background.eventMode = 'static'
-  overlay.addChild(background)
+    const background = new Sprite(textures[type])
+    background.width = VIRTUAL_WIDTH
+    background.height = VIRTUAL_HEIGHT
+    background.eventMode = 'static'
+    overlay.addChild(background)
 
-  // TV and Plant only
-  if (type === 'tv' || type === 'plant') {
-    const cancel = new Sprite(textures.cancel)
+    // TV and Plant only
+    if (type === 'tv' || type === 'plant') {
+      const cancel = new Sprite(textures.cancel)
 
-    cancel.position.set(
-      type === 'tv' ? 1045 : 1100,
-      type === 'tv' ? 80 : 40
-    )
+      cancel.position.set(
+        type === 'tv' ? 1045 : 1100,
+        type === 'tv' ? 80 : 40
+      )
 
-    clickable(cancel, closeOverlay, 'Close')
-    overlay.addChild(cancel)
-  }
-
-  // Plant only
-  if (type === 'plant') {
-    const water = new Sprite(textures.waterButton)
-
-    water.position.set(60, 50)
-
-    clickable(water, () => {
-      callbacks.onFeature?.('plant-water')
-
-      stopWatering()
-
-      const pot = new Sprite(textures.wateringPot)
-      pot.position.set(710, 150)
-
-      const drops = new Sprite(textures.waterDrops)
-      drops.position.set(630, 350)
-
-      overlay.addChild(pot, drops)
-
-      wateringAnimation = {
-        pot,
-        drops,
-        elapsed: 0,
-      }
-    }, 'Water plant')
-
-    overlay.addChild(water)
-  }
-
-  activeOverlay = type
-  overlay.visible = true
-}
-
-const zones = [
-  { type: 'tv', x: 251, y: 275, width: 230, height: 150 },
-  { type: 'radio', x: 800, y: 480, width: 130, height: 80 },
-  { type: 'plant', x: 500, y: 290, width: 100, height: 140 },
-]
-
-zones.forEach((zone) => {
-  const target = new Graphics()
-    .rect(zone.x, zone.y, zone.width, zone.height)
-    .fill({ color: 0xffffff, alpha: 0.001 })
-
-  target.eventMode = 'static'
-  target.cursor = 'pointer'
-
-  target.on('pointertap', () => {
-    callbacks.onFeature?.(zone.type, zone)
-
-    if (zone.type === 'radio') {
-      // Radio remains clickable, but has no interface.
-      return
+      clickable(cancel, closeOverlay, 'Close')
+      overlay.addChild(cancel)
     }
 
-    openOverlay(zone.type)
-  })
+    // Plant only
+    if (type === 'plant') {
+      const water = new Sprite(textures.waterButton)
 
-  scene.addChild(target)
-})
+      water.position.set(60, 50)
+
+      clickable(water, () => {
+        callbacks.onFeature?.('plant-water')
+
+        stopWatering()
+
+        const pot = new Sprite(textures.wateringPot)
+        pot.position.set(710, 150)
+
+        const drops = new Sprite(textures.waterDrops)
+        drops.position.set(630, 350)
+
+        overlay.addChild(pot, drops)
+
+        wateringAnimation = {
+          pot,
+          drops,
+          elapsed: 0,
+        }
+      }, 'Water plant')
+
+      overlay.addChild(water)
+    }
+
+    activeOverlay = type
+    overlay.visible = true
+  }
+
+  const zones = [
+    { type: 'tv', x: 251, y: 275, width: 230, height: 150, label: 'TV' },
+    { type: 'radio', x: 800, y: 480, width: 130, height: 80, label: 'Radio' },
+    { type: 'plant', x: 500, y: 290, width: 100, height: 140, label: 'Plant' },
+  ]
+
+  zones.forEach((zone) => {
+    const target = new Graphics()
+      .rect(zone.x, zone.y, zone.width, zone.height)
+      .fill({ color: 0xffffff, alpha: 0.001 })
+
+    target.eventMode = 'static'
+    target.cursor = 'pointer'
+
+    const decor = createHoverDecor(scene, tooltipLayer, {
+      x: zone.x,
+      y: zone.y,
+      width: zone.width,
+      height: zone.height,
+      label: zone.label,
+      haloPadding: 6,
+      insertBelow: overlay,
+    })
+    target.on('pointerover', () => decor.setVisible(true))
+    target.on('pointerout', () => decor.setVisible(false))
+
+    target.on('pointertap', () => {
+      callbacks.onFeature?.(zone.type, zone)
+
+      if (zone.type === 'radio') {
+        // Radio remains clickable, but has no interface.
+        return
+      }
+
+      openOverlay(zone.type)
+    })
+
+    scene.addChild(target)
+  })
 
   const keys = new Set()
   const keyDown = (event) => {
@@ -332,6 +438,10 @@ zones.forEach((zone) => {
       girlAnimation = 'idle'
     }
 
+    // Keep the halo/tooltip glued to the companion every frame — this runs
+    // regardless of walking/idle/wrap-around so it never drifts out of sync.
+    girlHover.reposition(girlHaloX(), girlHaloY())
+
     if (dogState === 'idle') {
       dogIdleElapsed += seconds
       if (dogIdleElapsed >= DOG_IDLE_SECONDS) {
@@ -353,7 +463,6 @@ zones.forEach((zone) => {
         dog.x += step
       }
     }
-
   })
 
   return {
