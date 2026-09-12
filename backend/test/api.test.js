@@ -137,7 +137,7 @@ test('Google write requires permission and an individual approved proposal', asy
   await request('/events', event('Lecture', '09:00', '12:00'))
   const created = (await request('/events', event('Study', '13:00', '15:00', { isFlexible: true, consequence: 'low' }))).data.event
   const data = store.get(user())
-  Object.assign(data.events.find(e => e.id === created.id), { source: 'google', googleId: 'one', etag: 'old' })
+  Object.assign(data.events.find(e => e.id === created.id), { source: 'google', googleEventId: 'one', etag: 'old' })
   data.google = { canWrite: false }; store.save(user(), data)
   const proposal = (await request('/proposals', { kind: 'timetable' })).data.proposals[0]
   assert.equal(writes.length, 0)
@@ -211,7 +211,7 @@ test('Google batch applies one approved move, preserves partial success and retr
   await request('/events', event('Laundry', '14:00', '14:30', { isFlexible: true, consequence: 'low' }))
   await request('/events', event('Grocery', '16:00', '16:30', { isFlexible: true, consequence: 'low' }))
   const data = store.get(user())
-  data.events.forEach((e, i) => Object.assign(e, { source: 'google', googleId: `remote-${i}`, etag: 'old-etag' }))
+  data.events.forEach((e, i) => Object.assign(e, { source: 'google', googleEventId: `remote-${i}`, etag: 'old-etag' }))
   store.save(user(), data)
   const [proposal] = (await request('/proposals', { kind: 'batch' })).data.proposals
   assert.equal(proposal.individualApproval, true)
@@ -284,12 +284,12 @@ test('local upload requires approval/write access and links one event without du
   const data = store.get(user()); data.google = { canWrite: true }; store.save(user(), data)
   assert.equal((await request(path, { approved: true })).status, 502)
   const pending = store.get(user()).events[0]
-  assert.equal(pending.source, 'local')
+  assert.equal(pending.source, 'moodify')
   fail = false
   const uploaded = (await request(path, { approved: true })).data.event
   assert.equal(uploaded.id, item.id)
   assert.equal(uploaded.source, 'google')
-  assert.equal(uploaded.googleId, pending.googleUploadId)
+  assert.equal(uploaded.googleEventId, pending.googleUploadId)
   assert.equal((await request(path, { approved: true })).status, 200)
   assert.equal(calls, 2)
   assert.equal((await request('/state')).data.events.length, 1)
@@ -304,7 +304,7 @@ test('Google time edits require approval and preserve local state on remote fail
     },
   })
   const item = (await request('/events', event('Laundry', '14:00', '14:30'))).data.event
-  const data = store.get(user()); Object.assign(data.events[0], { source: 'google', googleId: 'remote', etag: 'old' }); store.save(user(), data)
+  const data = store.get(user()); Object.assign(data.events[0], { source: 'google', googleEventId: 'remote', etag: 'old' }); store.save(user(), data)
   const path = `/events/${item.id}`
   const change = { start: '2026-09-10T16:00', end: '2026-09-10T16:45', approved: true }
   assert.equal((await request(path, { ...change, approved: false }, 'PATCH')).status, 400)

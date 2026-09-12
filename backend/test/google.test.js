@@ -56,22 +56,22 @@ test('Google sync reads every page, classifies, removes missing events and hides
       nextPageToken: 'page2', items: [remote('first'), remote('cancelled', { status: 'cancelled' }), remote('free', { transparency: 'transparent' }), remote('declined', { attendees: [{ self: true, responseStatus: 'declined' }] })],
     } }
   })
-  const data = profile(); data.events = [{ id: 'deleted', source: 'google' }, { id: 'local', source: 'local' }]
+  const data = profile(); data.events = [{ id: 'deleted', source: 'google' }, { id: 'moodify', source: 'moodify' }]
   assert.equal(await google.sync(data, Date.parse('2026-09-10')), 2)
   assert.equal(calls.length, 2); assert.equal(calls[0].params.singleEvents, true)
   assert.equal(data.events.length, 3)
-  assert.equal(data.events.find(e => e.googleId === 'second').category, 'social')
+  assert.equal(data.events.find(e => e.googleEventId === 'second').category, 'social')
   assert.equal(data.events.some(e => e.id === 'deleted'), false)
-  assert.equal(data.events.find(e => e.googleId === 'first').isFlexible, false)
+  assert.equal(data.events.find(e => e.googleEventId === 'first').isFlexible, false)
 })
 test('sync leaves existing events intact when a later page fails', async t => {
   t.mock.method(OAuth2Client.prototype, 'request', async options => {
     if (options.params.pageToken) throw new Error('offline')
     return { data: { items: [remote('new')], nextPageToken: 'page2' } }
   })
-  const data = profile(); data.events = [{ id: 'existing', source: 'local' }]
+  const data = profile(); data.events = [{ id: 'existing', source: 'moodify' }]
   await assert.rejects(google.sync(data, Date.parse('2026-09-10')), /could not complete/)
-  assert.deepEqual(data.events, [{ id: 'existing', source: 'local' }])
+  assert.deepEqual(data.events, [{ id: 'existing', source: 'moodify' }])
 })
 test('Google all-day imports use the user time zone and preserve exclusive end', async t => {
   t.mock.method(OAuth2Client.prototype, 'request', async () => ({ data: { items: [remote('all-day', { start: { date: '2026-09-10' }, end: { date: '2026-09-11' } })] } }))
@@ -87,7 +87,7 @@ test('Google move rechecks availability, sends only time changes and uses If-Mat
     return { data: options.method === 'PATCH' ? { etag: 'v2' } : { items: [] } }
   })
   const after = { start: '2026-09-11T00:00:00.000Z', end: '2026-09-11T01:00:00.000Z' }
-  await google.move(profile(), { googleId: 'original', etag: 'v1' }, after)
+  await google.move(profile(), { googleEventId: 'original', etag: 'v1' }, after)
   assert.equal(calls.length, 2)
   assert.equal(calls[1].headers['If-Match'], 'v1')
   assert.deepEqual(Object.keys(calls[1].data), ['start', 'end'])
@@ -96,7 +96,7 @@ test('Google move rechecks availability, sends only time changes and uses If-Mat
 test('new provider conflicts prevent any Google write', async t => {
   const calls = []
   t.mock.method(OAuth2Client.prototype, 'request', async options => { calls.push(options); return { data: { items: [remote('conflict')] } } })
-  await assert.rejects(google.move(profile(), { googleId: 'original', etag: 'v1' }, { start: '2026-09-11T00:00:00Z', end: '2026-09-11T01:00:00Z' }), /commitment in that slot/)
+  await assert.rejects(google.move(profile(), { googleEventId: 'original', etag: 'v1' }, { start: '2026-09-11T00:00:00Z', end: '2026-09-11T01:00:00Z' }), /commitment in that slot/)
   assert.equal(calls.length, 1)
 })
 test('OAuth read-only mode requests the narrow scope and write mode is explicit', () => {
@@ -134,13 +134,13 @@ test('direct upload preserves event fields and recovers a lost response with the
 
 test('sync reconciles an upload whose response was lost and preserves local metadata', async t => {
   const data = profile()
-  const item = { id: 'local-id', source: 'local', googleUploadId: 'b'.repeat(32), category: 'social', isFlexible: true, consequence: 'low' }
+  const item = { id: 'local-id', source: 'moodify', googleUploadId: 'b'.repeat(32), category: 'social', isFlexible: true, consequence: 'low' }
   data.events = [item]
   t.mock.method(OAuth2Client.prototype, 'request', async () => ({ data: { items: [remote(item.googleUploadId, { extendedProperties: { private: { moodifyLocalEvent: item.id } } })] } }))
   await google.sync(data)
   assert.equal(data.events.length, 1)
   assert.equal(data.events[0].id, item.id)
-  assert.equal(data.events[0].source, 'google')
+  assert.equal(data.events[0].source, 'moodify')
   assert.equal(data.events[0].category, 'social')
   assert.equal(data.events[0].isFlexible, true)
   await google.sync(data)
@@ -154,7 +154,7 @@ test('Google all-day time edits preserve date-only boundaries and ETag protectio
     if (options.method === 'PATCH') { patch = options; return { data: { etag: 'new' } } }
     return { data: { items: [] } }
   })
-  await google.move(data, { googleId: 'all-day', etag: 'old', allDay: true }, { start: '2026-09-10T16:00:00.000Z', end: '2026-09-11T16:00:00.000Z' })
+  await google.move(data, { googleEventId: 'all-day', etag: 'old', allDay: true }, { start: '2026-09-10T16:00:00.000Z', end: '2026-09-11T16:00:00.000Z' })
   assert.deepEqual(patch.data, { start: { date: '2026-09-11' }, end: { date: '2026-09-12' } })
   assert.equal(patch.headers['If-Match'], 'old')
 })

@@ -43,7 +43,8 @@ export function normalizeEvent(input, zone, previous = {}) {
     category, weight: WEIGHTS[category], classificationReason: input.category && input.category !== 'auto' ? 'Category selected by you.' : classified.classificationReason,
     isFlexible: input.isFlexible === true && !previous.hasAttendees, consequence,
     deadline: deadline?.toUTC().toISO() || null, allDay: input.allDay === true,
-    source: previous.source || 'local', completedAt: previous.completedAt || null,
+    source: previous.source === 'google' ? 'google' : (previous.source === 'ics' ? 'ics' : 'moodify'), completedAt: previous.completedAt || null,
+    syncToGoogle: previous.syncToGoogle || false, googleEventId: previous.googleEventId || null,
   }
 }
 export function hoursOnDay(event, date, zone) {

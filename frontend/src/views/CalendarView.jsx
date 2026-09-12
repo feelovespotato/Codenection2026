@@ -259,12 +259,18 @@ export default function CalendarView() {
             <div className="min-w-0"><h3 className="break-words font-bold">{event.title}</h3><p className="mt-1 text-xs text-stone-600">{event.allDay ? 'All-day · ' : ''}{displaySlot(event, zone)}</p></div>
             <span className={`h-fit rounded-full px-3 py-1 text-xs font-semibold ${categoryClass[event.category]}`}>{event.category}</span>
           </div>
-          <p className="mt-2 text-xs text-stone-500">{event.source} · {event.isFlexible ? `Flexible · ${event.consequence} consequence` : 'Fixed'} · {event.classificationReason}</p>
+          <p className="mt-2 text-xs text-stone-500">
+            {event.source === 'moodify' && !event.syncToGoogle && <span className="mr-2 font-semibold text-amber-800">Moodify</span>}
+            {event.source === 'moodify' && event.syncToGoogle && <span className="mr-2 font-semibold text-emerald-800">Moodify + Google ✓</span>}
+            {event.source === 'google' && <span className="mr-2 font-semibold text-blue-800">Google</span>}
+            · {event.isFlexible ? `Flexible · ${event.consequence} consequence` : 'Fixed'} · {event.classificationReason}
+          </p>
           {event.deadline && <p className="mt-1 text-xs text-stone-600">Deadline: {displaySlot({ start: event.deadline, end: event.deadline }, zone).split(' → ')[0]}</p>}
           <div className="mt-3 flex flex-wrap gap-2">
             <button className={secondaryClass} disabled={busy} onClick={() => { setEditing(event); setAdding(false) }}>Edit</button>
             {event.source !== 'google' && <button className={secondaryClass} disabled={busy} onClick={() => setPendingDelete(event.id)}>Delete</button>}
-            {event.source === 'local' && <button className={buttonClass} disabled={busy || !data.google.canWrite} onClick={() => action(`/events/${event.id}/upload-google`, { approved: true }, 'Uploaded to your primary Google calendar. This event is now linked; Sync now will update it without adding another local copy.')}>Upload to Google</button>}
+            {event.source === 'moodify' && !event.syncToGoogle && <button className={buttonClass} disabled={busy || !data.google.canWrite} onClick={() => action(`/events/${event.id}/upload-google`, { approved: true }, 'Synced to Google Calendar. This event is now linked.')}>Sync to Google</button>}
+            {event.source === 'moodify' && event.syncToGoogle && <button className={secondaryClass} disabled={busy} onClick={() => window.open('https://calendar.google.com', '_blank')}>Open in Google</button>}
             {event.category === 'recharge' && <span className="rounded-xl bg-emerald-50 px-4 py-2.5 text-xs font-semibold text-emerald-900">{event.allDay ? 'All-day recovery does not count toward streaks' : event.recoveryStatus === 'confirmed' ? 'Recovery confirmed · calendar streak' : event.recoveryStatus === 'inferred' ? 'Calendar streak only · completion inferred' : 'Counts toward calendar streak when this block ends'}</span>}
           </div>
           {pendingDelete === event.id && <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl bg-rose-50 p-3"><span>Delete this commitment from Moodify?</span><button className="rounded-lg bg-rose-700 px-3 py-2 font-semibold text-white" disabled={busy} onClick={async () => { const result = await action(`/events/${event.id}`, {}, 'Event deleted.', 'DELETE'); if (result) setPendingDelete(null) }}>Delete event</button><button className={secondaryClass} onClick={() => setPendingDelete(null)}>Keep event</button></div>}

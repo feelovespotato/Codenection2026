@@ -22,11 +22,11 @@ export function createGoogle(config, cipher) {
       throw new AppError(status === 412 ? 'This Google event changed. Sync again before approving.' : status === 401 || status === 403 ? 'Google access expired or permission was denied. Reconnect with the required access.' : 'Google Calendar could not complete the request. Sync before retrying.', status === 412 ? 409 : 502)
     }
   }
-  async function ensureFree(data, after, excludeGoogleId) {
+  async function ensureFree(data, after, excludeGoogleEventId) {
     let pageToken
     do {
       const result = await request(data, '/events', { params: { singleEvents: true, timeMin: after.start, timeMax: after.end, maxResults: 2500, pageToken } })
-      const conflict = (result.items || []).some(event => event.id !== excludeGoogleId && event.status !== 'cancelled' && event.transparency !== 'transparent' && !event.attendees?.some(a => a.self && a.responseStatus === 'declined'))
+      const conflict = (result.items || []).some(event => event.id !== excludeGoogleEventId && event.status !== 'cancelled' && event.transparency !== 'transparent' && !event.attendees?.some(a => a.self && a.responseStatus === 'declined'))
       requireValue(!conflict, 'Google Calendar has a commitment in that slot. Sync and generate fresh suggestions.', 409)
       pageToken = result.nextPageToken
     } while (pageToken)
@@ -76,15 +76,23 @@ export function createGoogle(config, cipher) {
         const response = await request(data, '/events', { params: { timeMin: from, timeMax: to, singleEvents: true, showDeleted: false, maxResults: 2500, pageToken } })
         for (const event of response.items || []) {
           if (event.status === 'cancelled' || event.transparency === 'transparent' || event.attendees?.some(a => a.self && a.responseStatus === 'declined')) continue
-          const previous = data.events.find(item => (item.source === 'google' && item.googleId === event.id) || (item.source === 'local' && item.googleUploadId === event.id && event.extendedProperties?.private?.moodifyLocalEvent === item.id))
+          const previous = data.events.find(item => (item.source === 'google' && item.googleEventId === event.id) || (item.source === 'moodify' && (item.googleEventId === event.id || (item.googleUploadId === event.id && event.extendedProperties?.private?.moodifyLocalEvent === item.id))))
           const allDay = Boolean(event.start.date)
           const start = allDay ? DateTime.fromISO(event.start.date, { zone: data.zone }).toISO() : event.start.dateTime
           const end = allDay ? DateTime.fromISO(event.end.date, { zone: data.zone }).toISO() : event.end.dateTime
           const hasAttendees = (event.attendees || []).some(a => !a.self)
-          imported.push(normalizeEvent({ title: event.summary || 'Untitled event', description: event.description, start, end, allDay,
-            category: previous?.category || 'auto', isFlexible: previous?.isFlexible || false, consequence: previous?.consequence || 'high',
-            deadline: previous?.deadline && Date.parse(previous.deadline) >= Date.parse(end) ? previous.deadline : null,
-          }, data.zone, { ...previous, source: 'google', googleId: event.id, etag: event.etag, hasAttendees }))
+          
+          if (previous && previous.source === 'moodify') {
+            imported.push(normalizeEvent({ title: event.summary || 'Untitled event', description: event.description, start, end, allDay,
+              category: previous.category || 'auto', isFlexible: previous.isFlexible || false, consequence: previous.consequence || 'high',
+              deadline: previous.deadline && Date.parse(previous.deadline) >= Date.parse(end) ? previous.deadline : null,
+            }, data.zone, { ...previous, source: 'moodify', syncToGoogle: true, googleEventId: event.id, etag: event.etag, hasAttendees }))
+          } else {
+            imported.push(normalizeEvent({ title: event.summary || 'Untitled event', description: event.description, start, end, allDay,
+              category: previous?.category || 'auto', isFlexible: previous?.isFlexible || false, consequence: previous?.consequence || 'high',
+              deadline: previous?.deadline && Date.parse(previous.deadline) >= Date.parse(end) ? previous.deadline : null,
+            }, data.zone, { ...previous, source: 'google', googleEventId: event.id, etag: event.etag, hasAttendees }))
+          }
         }
         requireValue(imported.length <= 10000, 'Too many Google events in the sync window. Use a smaller calendar.', 413)
         pageToken = response.nextPageToken
@@ -115,8 +123,8 @@ export function createGoogle(config, cipher) {
     },
     async move(data, event, after) {
       requireValue(data.google?.canWrite, 'Reconnect Google with write access to approve this move.', 409)
-      await ensureFree(data, after, event.googleId)
-      return request(data, `/events/${encodeURIComponent(event.googleId)}`, {
+      await ensureFree(data, after, event.googleEventId)
+      return request(data, `/events/${encodeURIComponent(event.googleEventId)}`, {
         method: 'PATCH', headers: { 'If-Match': event.etag }, params: { sendUpdates: 'none' },
         data: event.allDay ? {
           start: { date: DateTime.fromISO(after.start).setZone(data.zone).toISODate() },

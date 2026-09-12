@@ -141,6 +141,61 @@ export default function AgentChatView() {
     }
   }
 
+  const executeAction = async (syncToGoogle, actionToRun = pendingAction) => {
+    if (!actionToRun) return
+    setPendingAction(null)
+    setSending(true)
+    setSendError('')
+    try {
+      const { type, event: actionEvent, eventId } = actionToRun
+      const id = actionEvent?.id || eventId
+      
+      if (type === 'CREATE_EVENT' || type === 'UPDATE_EVENT') {
+         const body = {
+           title: actionEvent.title,
+           start: `${actionEvent.date}T${actionEvent.startTime || '00:00'}:00`,
+           end: `${actionEvent.date}T${actionEvent.endTime || '00:00'}:00`,
+           category: actionEvent.category || 'auto',
+           isFlexible: actionEvent.isFlexible ?? true
+         }
+         let res;
+         if (type === 'CREATE_EVENT') res = await run('/events', body, 'POST')
+         else res = await run(`/events/${id}`, body, 'PATCH')
+         
+         if (syncToGoogle && res?.event?.id && data?.google?.canWrite) {
+             await run(`/events/${res.event.id}/upload-google`, { approved: true }, 'POST')
+         }
+      }
+      else if (type === 'DELETE_EVENT') {
+         await run(`/events/${id}`, null, 'DELETE')
+      }
+    } catch (failure) {
+      setSendError(failure.message)
+    } finally {
+      setSending(false)
+      inputRef.current?.focus()
+    }
+  }
+
+  const handleDeleteChoice = async (choice, id) => {
+    setPendingDelete(null)
+    setSending(true)
+    setSendError('')
+    try {
+      if (choice === 'moodify' || choice === 'both') {
+        await run(`/events/${id}`, null, 'DELETE')
+      }
+      // Note: 'Google only' would require an API endpoint we don't currently expose
+    } catch (failure) {
+      setSendError(failure.message)
+    } finally {
+      setSending(false)
+    }
+  }
+  
+  const [pendingAction, setPendingAction] = useState(null)
+  const [pendingDelete, setPendingDelete] = useState(null)
+
   const handleSend = async (event) => {
     event.preventDefault()
     const text = input.trim()
@@ -158,20 +213,18 @@ export default function AgentChatView() {
       
       if (response.planningState) setPlanningState(response.planningState)
       if (response.calendarAction) {
-        const { type, event } = response.calendarAction
-        if (type === 'CREATE_EVENT' || type === 'UPDATE_EVENT') {
-           const body = {
-             title: event.title,
-             start: `${event.date}T${event.startTime || '00:00'}:00`,
-             end: `${event.date}T${event.endTime || '00:00'}:00`,
-             category: event.category || 'auto',
-             isFlexible: event.isFlexible ?? true
+        const { type, event: actionEvent, eventId } = response.calendarAction
+        const id = actionEvent?.id || eventId
+        
+        if (type === 'DELETE_EVENT') {
+           const existing = data?.events?.find(e => e.id === id)
+           if (existing && existing.syncToGoogle) {
+             setPendingDelete(existing)
+           } else {
+             await executeAction(false, response.calendarAction)
            }
-           if (type === 'CREATE_EVENT') await run('/events', body, 'POST')
-           else await run(`/events/${event.id}`, body, 'PATCH')
-        }
-        else if (type === 'DELETE_EVENT') {
-           await run(`/events/${response.calendarAction.event?.id || response.calendarAction.eventId}`, null, 'DELETE')
+        } else {
+           setPendingAction(response.calendarAction)
         }
       }
     } catch (failure) {
@@ -231,6 +284,40 @@ export default function AgentChatView() {
                 </div>
               </div>
             )}
+            
+            {pendingAction && (
+              <div className="flex flex-col items-start animate-in fade-in duration-200">
+                <div className="max-w-[85%] rounded-2xl p-5 text-base shadow-sm bg-white border border-stone-200 text-stone-800 rounded-bl-xs">
+                  <p className="font-medium mb-3">Where should I save it?</p>
+                  <div className="flex flex-col gap-2">
+                    <button onClick={() => executeAction(false)} className="rounded-xl border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-stone-700 hover:bg-stone-50">Moodify only</button>
+                    {data?.google?.connected ? (
+                      <button onClick={() => executeAction(true)} className="rounded-xl bg-amber-700 px-4 py-2 text-sm font-bold text-white hover:bg-amber-800">Moodify + Google</button>
+                    ) : (
+                      <button onClick={() => {
+                        api('/google/connect', { method: 'POST', body: { write: true } })
+                          .then(res => { if (res.url) window.location.assign(res.url) })
+                      }} className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700">Connect Google</button>
+                    )}
+                    <button onClick={() => setPendingAction(null)} className="rounded-xl border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-50">Cancel</button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {pendingDelete && (
+              <div className="flex flex-col items-start animate-in fade-in duration-200">
+                <div className="max-w-[85%] rounded-2xl p-5 text-base shadow-sm bg-white border border-stone-200 text-stone-800 rounded-bl-xs">
+                  <p className="font-medium mb-3">delete from where?</p>
+                  <div className="flex flex-col gap-2">
+                    <button onClick={() => handleDeleteChoice('moodify', pendingDelete.id)} className="rounded-xl border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-stone-700 hover:bg-stone-50">Moodify only</button>
+                    <button onClick={() => handleDeleteChoice('both', pendingDelete.id)} className="rounded-xl bg-rose-700 px-4 py-2 text-sm font-bold text-white hover:bg-rose-800">Both</button>
+                    <button onClick={() => setPendingDelete(null)} className="rounded-xl border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-stone-700 hover:bg-stone-50">Cancel</button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div ref={bottomRef} />
           </div>
 

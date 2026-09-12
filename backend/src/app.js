@@ -610,7 +610,7 @@ Reply using a strict JSON format exactly like this:
       )
 
       requireValue(
-        event.googleId && event.etag,
+        event.googleEventId && event.etag,
         'Sync Google before editing this event.',
         409
       )
@@ -658,7 +658,7 @@ Reply using a strict JSON format exactly like this:
     }
 
     requireValue(
-      event.source === 'local',
+      event.source === 'moodify',
       'Only local events can be uploaded directly.'
     )
 
@@ -676,8 +676,8 @@ Reply using a strict JSON format exactly like this:
     const remote = await google.upload(data, event)
 
     Object.assign(event, {
-      source: 'google',
-      googleId: remote.id,
+      syncToGoogle: true,
+      googleEventId: remote.id,
       etag: remote.etag
     })
 
@@ -979,7 +979,7 @@ Reply using a strict JSON format exactly like this:
 
         if (event.source === 'google') {
           requireValue(
-            event.googleId && event.etag,
+            event.googleEventId && event.etag,
             'Sync Google before moving this event.',
             409
           )
@@ -1102,8 +1102,8 @@ Reply using a strict JSON format exactly like this:
         )
 
         Object.assign(event, {
-          source: 'google',
-          googleId: remote.id,
+          syncToGoogle: true,
+          googleEventId: remote.id,
           etag: remote.etag
         })
       }
