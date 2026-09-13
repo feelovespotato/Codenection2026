@@ -2,8 +2,8 @@
 
 **Team:** Goh Pei Jia, Coshin Lee, Looi Yu Zhi  
 **Problem Statement:** Stress & Workload Manager  
-**Video Presentation:** [Unlisted YouTube Link]  
-**Presentation Slides:** [[Public Link](https://www.canva.com/design/DAHU3nlrMM4/a4z6HpJW9CrQOJzlVh4Ccg/edit)]
+**Video Presentation:** [[Unlisted YouTube Link](https://youtu.be/iySGSw00LiM)]  Also have backup video can watch in reporistory if link hae issue.
+**Presentation Slides:** [[Public Link](https://www.canva.com/design/DAHU3nlrMM4/a4z6HpJW9CrQOJzlVh4Ccg/edit)] 
 
 # 1. Project Overview
 
