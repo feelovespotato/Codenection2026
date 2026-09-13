@@ -352,6 +352,12 @@ This moves Moodify from a collection of prototype screens toward a connected sys
 
 ---
 
+**Planning & Scope**
+
+With a three-person team (Goh Pei Jia, Coshin Lee, Looi Yu Zhi) working within a hackathon timeframe, we scoped Moodify around one connected loop — calendar data, stress check-ins, and AI-driven action — rather than spreading effort across every possible wellness feature. Features that would have added real value but needed disproportionate time, external permissions, or specialised data (LMS integration, wearable sync, longer-term predictive forecasting, full account management, deeper personalisation) were deliberately deferred rather than half-built, so the core capacity-and-recovery loop could be finished, tested, and actually deployed. The project is live on Vercel today (frontend + backend), which reflects that the chosen scope was realistic for the team and timeframe available.
+
+---
+
 ### 8. What We're Deliberately Leaving Out — For Now
 
 Moodify is designed as a **workload and recovery assistant**, not a medical diagnosis system.
@@ -371,6 +377,10 @@ These features matter, but trying to build everything would weaken the core expe
 For this version, the priority is clear:
 
 > **Understand what a student is carrying, recognise pressure earlier, and turn that understanding into an action they can actually take.**
+
+**Build Plan — Next 3 Weeks**
+
+With the core capacity-and-recovery loop already built and deployed, the next building phase's top priority is **Wearable Integration** (Apple Health / Google Fit) — bringing in real sleep, activity, and physiological signals to replace the current calendar-based Sleep Proxy Estimator with actual biometric data, tightening the accuracy of the Capacity Score. Alongside this, the AI-driven parts of the other deferred items — such as LMS-aware workload classification and longer-term predictive forecasting — will be refined rather than fully built out, sharpening the intelligence behind existing features without expanding scope. Advanced account management and deeper personalisation stay on the backlog beyond this phase.
 
 ## How to Run Moodify
 
