@@ -37,6 +37,7 @@ export class SoundPlayer {
         if (this.audio) { this.audio.onerror = null; this.audio.pause(); this.audio.src = '' }
         this.audio = this.createAudio(track.file)
         this.audio.loop = true
+        this.audio.preload = 'auto'
         this.audio.volume = next.volume
       }
       if (this.audio) this.audio.volume = next.volume
@@ -64,6 +65,12 @@ export class SoundPlayer {
     this.background.loop = true
     this.background.preload = 'auto'
     this.syncBackground()
+
+    const track = TRACKS.find(t => t.id === this.state.activeTrackId) || TRACKS[0]
+    this.audio = this.createAudio(track.file)
+    this.audio.loop = true
+    this.audio.preload = 'auto'
+    this.audio.volume = this.state.volume
   }
   setSettings(settings) { this.settings = settings; this.syncBackground() }
   syncBackground = () => {
@@ -83,6 +90,7 @@ export class SoundPlayer {
     this.update({ activeTrackId: track.id })
     this.audio = this.createAudio(track.file)
     this.audio.loop = true
+    this.audio.preload = 'auto'
     this.audio.volume = this.state.volume
     const audio = this.audio
     audio.onerror = () => {

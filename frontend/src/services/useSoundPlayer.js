@@ -23,17 +23,21 @@ export function useSoundPlayer(settings) {
   useEffect(() => {
     let alive = true
     let publishing = false
+    let lastLocalUpdate = 0
     const publish = async () => {
       if (!alive || player.isApplyingCompanionState || publishing) return
       publishing = true
+      lastLocalUpdate = Date.now()
       const { activeTrackId, isPlaying, isStarting, volume } = player.getSnapshot()
       try { await updateCompanionState({ music: { activeTrackId, isPlaying: isPlaying || isStarting, volume } }) } catch { /* The normal player still works if the local API is offline. */ }
       finally { publishing = false }
     }
     const sync = async () => {
       try {
+        const fetchStart = Date.now()
         const shared = await readCompanionState()
         if (!alive || player.isApplyingCompanionState) return
+        if (lastLocalUpdate > fetchStart - 2000) return
         const current = player.getSnapshot()
         const effectivelyPlaying = current.isPlaying || current.isStarting
         const music = shared.music
