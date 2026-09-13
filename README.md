@@ -29,7 +29,7 @@ Moodify flips the script, it's **not** another productivity tracker, but it's a 
 - **Automatic workload classification** into Cognitive, Social, and Recharge categories.
 - **Objective load calculation** based on the duration and type of scheduled activities.
 - **Daily check-in and mood tracking** to capture the subjective side of stress.
-- **Capacity dashboard** combining objective load and subjective stress into a simple signal.
+- **Capacity dashboard** fusing objective load (45%) and subjective stress (55%) into a single signal.
 - **Load Shedder** that finds safer opportunities to move flexible, lower-consequence activities.
 - **AI Recovery Scheduler** that looks for available time and recommends short recovery blocks.
 - **AI Timetable Suggester** that proposes alternative timing while respecting conflicts, deadlines, fixed events, and past/completed activities.
@@ -46,6 +46,8 @@ Moodify flips the script, it's **not** another productivity tracker, but it's a 
 **Task Batching** Groups small errands into efficient back-to-back time blocks
 - **Sleep Proxy Estimator** Infers sleep windows from calendar gaps without manual logging
 - **Deadline Density Flag** Looks ahead 3 days and flags unusually heavy days
+- **Guided Breathing Pacer** Four breathing techniques (Balance, Relax, Calm, Release) with session tracking
+- **Recovery Streak Tracker** Tracks consecutive days with completed recovery blocks
 
 
 ##### The intended before/after impact is simple:
@@ -59,7 +61,7 @@ Moodify is initially designed around students, but the same capacity-management 
 
 ## 2.1 Ideas We Considered
 
-Table of every distinct idea generated, with why each was kept or dropped, order it so that chosen ideas are listed first
+Every distinct idea we generated during ideation, why it was kept or dropped, with the chosen ideas listed first.
 
 | Idea | Why it was dropped / kept |
 | --- | --- |
@@ -72,6 +74,8 @@ Table of every distinct idea generated, with why each was kept or dropped, order
 | **Reflections diary with sentiment analysis (Chosen)** | **Kept** Numbers alone cannot explain everything a student is going through. The diary allows users to reflect more naturally, while Moodify can use the conversation or reflection to identify mood patterns and create a more complete view of their wellbeing. |
 | **Social peer rooms with real-time chat (Chosen)** | **Kept** Stress can feel more difficult when students feel isolated. A lightweight social space gives users a sense of connection without turning Moodify into a full social-media platform. |
 | **Boundary Guard (AI-drafted decline/defer messages) (Chosen)** | **Kept** Sometimes workload grows because students find it difficult to say no or ask for more time. Moodify can generate simple decline or defer messages in different tones, helping users protect their time without having to figure out the wording themselves.|
+| **AI Organizer through chat (Chosen)** | **Kept** A conversational AI that allows users to chat naturally through voice or text, express their thoughts, feelings, and tasks, and receive supportive responses. It can also understand relevant information from the conversation and help organise it into the user's calendar or diary, reducing the need for manual input. |
+| **Interactive Companion Character (Chosen)** | **Kept** A friendly virtual companion that appears in a separate desktop window when the Moodify webpage is inactive, allowing users to interact with features such as music and the focus timer outside the main webpage. |
 |**Pure chatbot therapist / mental health diagnosis tool** | **Dropped** We did not want Moodify to pretend to be a therapist or diagnose mental-health conditions. Instead, the system focuses on workload, stress awareness, planning and recovery, while leaving professional diagnosis to qualified experts.|
 |**Full LMS integration (Canvas/Moodle)** | **Dropped for now** It could improve academic workload tracking, but integrating multiple LMS platforms would add too much technical and institutional complexity for the current scope. Google Calendar already captures a large part of the student’s daily schedule.|
 |**Wearable sync (Apple Health / Google Fit)** | **Dropped for now** Biometric signals such as sleep or activity could improve accuracy, but wearable APIs would increase development complexity. For the current version, Moodify uses lighter signals such as calendar patterns, check-ins and a sleep proxy instead. The current backend already includes a calendar-based sleep proxy.|
@@ -82,11 +86,13 @@ Table of every distinct idea generated, with why each was kept or dropped, order
 
 [![Mindmap](docs/mindmap.jpeg)](docs/mindmap.jpeg)
 
+This map traces our thinking from the root problem down to the final feature set: **Student Burnout** breaks into root causes (no schedule planning, tight schedules, no hobby time, invisible stress, social isolation, discomfort socialising, inability to focus) and into our **first attempt** — a plain calendar + dashboard + AI load balancer. The underlying idea was sound, but the plain presentation tested as "too many words, boring," which pushed a **second attempt** built around gamified, cozy interaction — branching into chatting with AI, needing safe social connection, soft music, and exercise. Those branches map directly onto shipped features (mood tracker, diary, Stress Assessment Quiz, daily check-in with AI sentiment analysis, gamified Social Room, Ambient Soundscapes, Guided Breathing Pacer). The bottom-right loop then checks the calendar-only approach on its own: once we leaned mostly on Google Calendar as the data source, we flagged the downside — no Capacity Gauge, Load Shedder, Task Batching, or AI Scheduler — and looped back to the **same conclusion as attempt one**: Calendar + Dashboard + AI is still the right core, just carried inside the gamified interface instead of a plain one, and extended with the capacity/load features the calendar-only version was missing.
+
 ## 2.3 Mentor Consultation
 
 | Date | Mentor | Feedback Received | What Was Changed |
 |---|---|---|---|
-| 10-09-2026 | Iris Yan Ning | 1. **Prevent all widgets too bulky**<br><br>2. **Allow user to hide the navigation bar**<br><br>3. **Add on more interaction object** | 1. **Nav buttons restyled** with shrink-0, tighter padding, centered single-row horizontal layout that scrolls sideways instead of wrapping.<br><br>2. New **isNavHidden toggle state** added to App.jsx — a ≡/X button now shows/hides the entire Quick Hub nav row.<br><br>3. **Hover tooltips + glow halos** on every interactive sprite (icons, TV, radio, plant, settings). Dog is now clickable and barks (dog-bark.mp3). Girl character is clickable and opens a companion chat. Cursor changes to pointer on all hotspots. |
+| 10-09-2026 | Iris Yan Ning | 1. **Prevent all widgets too bulky**<br><br>2. **Allow user to hide the navigation bar**<br><br>3. **Add on more interaction object**<br><br>4. **Make the toggle icon in game more obvious** | 1. **Nav buttons restyled** with shrink-0, tighter padding, centered single-row horizontal layout that scrolls sideways instead of wrapping.<br><br>2. New **isNavHidden toggle state** added to App.jsx — a ≡/X button now shows/hides the entire Quick Hub nav row.<br><br>3. **Hover tooltips + glow halos** on every interactive sprite (icons, TV, radio, plant, settings). Dog is now clickable and barks (dog-bark.mp3). Girl character is clickable and opens a companion chat. Cursor changes to pointer on all hotspots.<br><br>4. **Added a yellow outline and name tag** to each clickable object when the user hovers over it. |
 | 11-09-2026 | Zach Khong | 1. **Add on Lofi music**<br><br>2. **Add on AI chatbot, let AI chatbot to guide user how to release stress**<br><br>3. **Make the character inside the website becomsystem interactive** | 1. **Radio zone still exists** and triggers onFeature('radio'), but the radio overlay was simplified (no more overlay panel for radio — it just triggers the sound modal directly). The sound/ambient system was already in place.<br><br>2. New **AgentChatView.jsx** added — an AI chat modal titled "Moodify Assistant" with subtitle "a space to think out loud". New **agent.js** service added for backend communication. Accessible by clicking the girl character or via the modal system.<br><br>3. The **girl character is now fully interactive** — clicking her opens the AI companion chat (onCompanion callback). A hover halo + tooltip ("Chat with Moodify") follows her as she walks. A desktop companion window (companion/, CompanionCharacter.jsx) was also added with a reading animation. |
 
 # 3. Design & Prototype
@@ -107,6 +113,7 @@ Table of every distinct idea generated, with why each was kept or dropped, order
 | [![mood_tracker](docs/UI/mood_tracker.png)](docs/UI/mood_tracker.png) | Captures the subjective side of stress—emotions and triggers—to measure how a schedule actually feels. |
 | [![diary](docs/UI/diary.png)](docs/UI/diary.png) | Reflection loop connecting conversations to diary/mood tracking while keeping dedicated planning conversations separate. |
 | [![stress](docs/UI/stress.png)](docs/UI/stress.png) | A quick 1–5 daily check-in that measures perceived heaviness, combining subjective feelings with objective calendar load. |
+| [![companion](docs/UI/companion.png)](docs/UI/companion.png) | Standalone Electron desktop companion — stays available when the main tab is inactive, with its own reading animation and quick controls for music and the focus timer. |
 
 # 4. What Makes It Different
 
